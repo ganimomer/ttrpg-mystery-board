@@ -20,6 +20,31 @@ interface DiscordProfile {
   avatar: string | null;
 }
 
+// Exchange an OAuth2 authorization code for an access token. The redirect flow
+// passes its redirect_uri; the Activity (Embedded SDK) flow omits it. Returns
+// the access token, or null on a failed exchange.
+async function exchangeCode(
+  code: string,
+  redirectUri?: string,
+): Promise<string | null> {
+  const params = new URLSearchParams({
+    client_id: config.discord.clientId,
+    client_secret: config.discord.clientSecret,
+    grant_type: "authorization_code",
+    code,
+  });
+  if (redirectUri) params.set("redirect_uri", redirectUri);
+
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params,
+  });
+  if (!res.ok) return null;
+  const { access_token } = (await res.json()) as { access_token: string };
+  return access_token ?? null;
+}
+
 // Fetch the Discord profile for an access token and upsert our user record.
 async function upsertDiscordUser(accessToken: string): Promise<Me | null> {
   const userRes = await fetch(USER_URL, {
@@ -78,22 +103,10 @@ authRoutes.get("/discord/callback", async (c) => {
     return c.redirect(`${config.appOrigin}/?error=auth`);
   }
 
-  // Exchange code → access token.
-  const tokenRes = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: config.discord.clientId,
-      client_secret: config.discord.clientSecret,
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: config.discord.redirectUri,
-    }),
-  });
-  if (!tokenRes.ok) return c.redirect(`${config.appOrigin}/?error=token`);
-  const token = (await tokenRes.json()) as { access_token: string };
+  const accessToken = await exchangeCode(code, config.discord.redirectUri);
+  if (!accessToken) return c.redirect(`${config.appOrigin}/?error=token`);
 
-  const me = await upsertDiscordUser(token.access_token);
+  const me = await upsertDiscordUser(accessToken);
   if (!me) return c.redirect(`${config.appOrigin}/?error=profile`);
 
   setSession(c, me.user.id);
@@ -108,24 +121,14 @@ authRoutes.post("/discord/token", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { code?: string };
   if (!body.code) return c.json({ error: "Missing code" }, 400);
 
-  const tokenRes = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: config.discord.clientId,
-      client_secret: config.discord.clientSecret,
-      grant_type: "authorization_code",
-      code: body.code,
-    }),
-  });
-  if (!tokenRes.ok) return c.json({ error: "Token exchange failed" }, 401);
-  const token = (await tokenRes.json()) as { access_token: string };
+  const accessToken = await exchangeCode(body.code);
+  if (!accessToken) return c.json({ error: "Token exchange failed" }, 401);
 
-  const me = await upsertDiscordUser(token.access_token);
+  const me = await upsertDiscordUser(accessToken);
   if (!me) return c.json({ error: "Could not read Discord profile" }, 401);
 
   return c.json({
-    access_token: token.access_token,
+    access_token: accessToken,
     token: signSession(me.user.id),
     user: me.user,
     isGameMaster: me.isGameMaster,
