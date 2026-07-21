@@ -14,6 +14,7 @@ import type {
   UpdateConnectionInput,
   UpdateTidbitInput,
 } from "@board/shared";
+import { getToken } from "./auth/token";
 
 class ApiError extends Error {
   constructor(
@@ -24,16 +25,25 @@ class ApiError extends Error {
   }
 }
 
+/** Append the session token as a query param (for URLs that can't set headers). */
+function withToken(url: string): string {
+  const token = getToken();
+  if (!token) return url;
+  return url + (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token);
+}
+
 async function req<T>(
   path: string,
   init?: RequestInit & { json?: unknown },
 ): Promise<T> {
   const { json, ...rest } = init ?? {};
+  const token = getToken();
   const res = await fetch(`/api${path}`, {
     credentials: "include",
     ...rest,
     headers: {
       ...(json !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(rest.headers ?? {}),
     },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
@@ -129,7 +139,10 @@ export const api = {
       body: form,
     });
   },
-  imageUrl: (imageId: string) => `/api/images/${imageId}`,
+  // These are used as an <img> src and an EventSource URL, which can't set an
+  // Authorization header, so the token (when present) rides as a query param.
+  imageUrl: (imageId: string) => withToken(`/api/images/${imageId}`),
+  eventsUrl: (boardId: string) => withToken(`/api/boards/${boardId}/events`),
 };
 
 export { ApiError };

@@ -42,7 +42,7 @@ export function useBoardSync(boardId: string): BoardState {
 
   // Live updates via SSE.
   useEffect(() => {
-    const es = new EventSource(`/api/boards/${boardId}/events`, {
+    const es = new EventSource(api.eventsUrl(boardId), {
       withCredentials: true,
     });
     const onBoard = (ev: MessageEvent) => {

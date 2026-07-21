@@ -1,16 +1,17 @@
 import type { Context, MiddlewareHandler } from "hono";
-import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { eq } from "drizzle-orm";
 import type { User } from "@board/shared";
 import { config } from "../config.js";
 import { db, schema } from "../db/index.js";
 import type { AppEnv } from "../types.js";
+import { signSession, verifySession } from "./token.js";
 
 const COOKIE = "session";
 const THIRTY_DAYS = 60 * 60 * 24 * 30;
 
-export async function setSession(c: Context, userId: string): Promise<void> {
-  await setSignedCookie(c, COOKIE, userId, config.sessionSecret, {
+export function setSession(c: Context, userId: string): void {
+  setCookie(c, COOKIE, signSession(userId), {
     httpOnly: true,
     secure: config.isProd,
     sameSite: "Lax",
@@ -23,8 +24,22 @@ export function clearSession(c: Context): void {
   deleteCookie(c, COOKIE, { path: "/" });
 }
 
-async function getSessionUser(c: Context): Promise<User | null> {
-  const userId = await getSignedCookie(c, config.sessionSecret, COOKIE);
+/**
+ * Resolve the signed session token from, in order: an `Authorization: Bearer`
+ * header (Discord Activity / any header-capable client), a `?token=` query
+ * param (for `<img>` and `EventSource`, which can't set headers), or the
+ * session cookie (standalone browser). All three carry the same signed value.
+ */
+function readToken(c: Context): string | null {
+  const auth = c.req.header("Authorization");
+  if (auth?.startsWith("Bearer ")) return auth.slice(7);
+  const q = c.req.query("token");
+  if (q) return q;
+  return getCookie(c, COOKIE) ?? null;
+}
+
+function getSessionUser(c: Context): User | null {
+  const userId = verifySession(readToken(c));
   if (!userId) return null;
   const row = db
     .select()
@@ -37,7 +52,7 @@ async function getSessionUser(c: Context): Promise<User | null> {
 
 /** Populates c.var.user or returns 401. */
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const user = await getSessionUser(c);
+  const user = getSessionUser(c);
   if (!user) return c.json({ error: "Not authenticated" }, 401);
   c.set("user", user);
   await next();
@@ -45,7 +60,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
 
 /** Populates c.var.user if present, but never blocks. */
 export const optionalAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const user = await getSessionUser(c);
+  const user = getSessionUser(c);
   if (user) c.set("user", user);
   await next();
 };
