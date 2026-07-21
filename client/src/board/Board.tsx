@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { Card, Connection } from "@board/shared";
+import { NotepadOverlay } from "./NotepadOverlay";
 import { Polaroid } from "./Polaroid";
 import { StringLayer } from "./StringLayer";
 import { useViewport } from "./useViewport";
@@ -10,6 +11,7 @@ export interface BoardHandles {
 }
 
 interface Props {
+  boardId: string;
   cards: Record<string, Card>;
   connections: Record<string, Connection>;
   editable: boolean;
@@ -23,6 +25,7 @@ interface Props {
 }
 
 export function Board({
+  boardId,
   cards,
   connections,
   editable,
@@ -46,6 +49,7 @@ export function Board({
   const containerRef = useRef<HTMLDivElement>(null);
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const [openNotepadCardId, setOpenNotepadCardId] = useState<string | null>(null);
 
   if (handlesRef) {
     handlesRef.current = {
@@ -135,12 +139,22 @@ export function Board({
             onDragMove={(id, x, y) => onMoveCard(id, x, y, false)}
             onDragEnd={(id, x, y) => onMoveCard(id, x, y, true)}
             onTackClick={handleTackClick}
+            onOpenNotepad={setOpenNotepadCardId}
           />
         ))}
       </div>
 
       {pendingFrom && (
         <div className="board-hint">Click another card’s tack to tie the string · Esc / click empty to cancel</div>
+      )}
+
+      {openNotepadCardId && cards[openNotepadCardId] && (
+        <NotepadOverlay
+          boardId={boardId}
+          card={cards[openNotepadCardId]}
+          editable={editable}
+          onClose={() => setOpenNotepadCardId(null)}
+        />
       )}
     </div>
   );

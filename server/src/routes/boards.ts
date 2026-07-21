@@ -1,13 +1,13 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import type { Board, BoardSnapshot, Invite } from "@board/shared";
+import type { Board, BoardSnapshot, Invite, Tidbit } from "@board/shared";
 import { getMembership, requireBoardGM, requireBoardMember } from "../access.js";
 import { config, isGameMaster } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { toCard, toConnection } from "../mappers.js";
-import { visibleCards, visibleConnections } from "../reveal.js";
+import { toCard, toConnection, toTidbit } from "../mappers.js";
+import { shapeCardForRole, visibleCards, visibleConnections } from "../reveal.js";
 import { publishBoardRenamed } from "../realtime/bus.js";
 import { requireAuth } from "../auth/session.js";
 import type { AppEnv } from "../types.js";
@@ -74,12 +74,25 @@ boardsRoutes.get("/:boardId", requireBoardMember, (c) => {
     .where(eq(schema.boards.id, boardId))
     .get()!;
 
+  // Batch-load tidbits for the whole board and group them by card.
+  const notesByCard = new Map<string, Tidbit[]>();
+  for (const row of db
+    .select()
+    .from(schema.noteItems)
+    .where(eq(schema.noteItems.boardId, boardId))
+    .orderBy(asc(schema.noteItems.position))
+    .all()) {
+    const list = notesByCard.get(row.cardId) ?? [];
+    list.push(toTidbit(row));
+    notesByCard.set(row.cardId, list);
+  }
+
   const allCards = db
     .select()
     .from(schema.cards)
     .where(eq(schema.cards.boardId, boardId))
     .all()
-    .map(toCard);
+    .map((row) => toCard(row, notesByCard.get(row.id) ?? []));
   const allConnections = db
     .select()
     .from(schema.connections)
@@ -87,8 +100,11 @@ boardsRoutes.get("/:boardId", requireBoardMember, (c) => {
     .all()
     .map(toConnection);
 
-  // Players never receive hidden items — enforced here, server-side.
-  const cards = visibleCards(allCards, role);
+  // Players never receive hidden items — enforced here, server-side. Cards are
+  // additionally shaped so un-revealed tidbit text is stripped from the notepad.
+  const cards = visibleCards(allCards, role).map((c) =>
+    shapeCardForRole(c, role),
+  );
   const visibleIds = new Set(cards.map((c) => c.id));
   const connections = visibleConnections(allConnections, visibleIds, role);
 

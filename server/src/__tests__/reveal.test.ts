@@ -13,6 +13,7 @@ function card(id: string, revealed: boolean): Card {
     y: 0,
     rotation: 0,
     revealed,
+    notepad: [],
   };
 }
 

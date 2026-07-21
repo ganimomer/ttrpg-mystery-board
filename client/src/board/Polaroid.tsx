@@ -14,6 +14,7 @@ interface Props {
   onDragMove: (id: string, x: number, y: number) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
   onTackClick: (id: string) => void;
+  onOpenNotepad: (id: string) => void;
 }
 
 export function Polaroid({
@@ -26,6 +27,7 @@ export function Polaroid({
   onDragMove,
   onDragEnd,
   onTackClick,
+  onOpenNotepad,
 }: Props) {
   const drag = useRef<{
     pointerId: number;
@@ -38,7 +40,7 @@ export function Polaroid({
 
   function onPointerDown(e: React.PointerEvent) {
     if (!editable) return;
-    if ((e.target as HTMLElement).closest(".tack-hit")) return; // tack handles its own
+    if ((e.target as HTMLElement).closest(".tack-hit, .notepad-peek")) return;
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     drag.current = {
@@ -71,6 +73,8 @@ export function Polaroid({
     }
   }
 
+  const hasNotepad = card.notepad.length > 0;
+
   return (
     <div
       className={[
@@ -93,32 +97,54 @@ export function Polaroid({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <button
-        type="button"
-        className="tack-hit"
-        title={editable ? "Start / finish a string here" : undefined}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          onTackClick(card.id);
-        }}
-      >
-        <Thumbtack color={card.revealed ? "#d63031" : "#8d6e63"} />
-      </button>
+      {/* Lined yellow notepaper tucked behind the card, edge peeking below. */}
+      {hasNotepad && (
+        <button
+          type="button"
+          className="notepad-peek"
+          title="Open notepad"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenNotepad(card.id);
+          }}
+        >
+          <span className="notepad-peek-count">{card.notepad.length}</span>
+        </button>
+      )}
 
-      <div className="polaroid-photo">
-        {card.imageId ? (
-          <img src={api.imageUrl(card.imageId)} alt={card.title} draggable={false} />
-        ) : (
-          <div className="polaroid-photo-empty">no photo</div>
-        )}
-      </div>
-      <div className="polaroid-caption">
-        {card.title && <div className="polaroid-title">{card.title}</div>}
-        {card.note && <div className="polaroid-note">{card.note}</div>}
-        {!card.title && !card.note && (
-          <div className="polaroid-note polaroid-note--muted">…</div>
-        )}
+      <div className="polaroid-inner">
+        <button
+          type="button"
+          className="tack-hit"
+          title={editable ? "Start / finish a string here" : undefined}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTackClick(card.id);
+          }}
+        >
+          <Thumbtack color={card.revealed ? "#d63031" : "#8d6e63"} />
+        </button>
+
+        <div className="polaroid-photo">
+          {card.imageId ? (
+            <img
+              src={api.imageUrl(card.imageId)}
+              alt={card.title}
+              draggable={false}
+            />
+          ) : (
+            <div className="polaroid-photo-empty">no photo</div>
+          )}
+        </div>
+        <div className="polaroid-caption">
+          {card.title && <div className="polaroid-title">{card.title}</div>}
+          {card.note && <div className="polaroid-note">{card.note}</div>}
+          {!card.title && !card.note && (
+            <div className="polaroid-note polaroid-note--muted">…</div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -83,5 +83,16 @@ export function bootstrapSchema(): void {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
     CREATE INDEX IF NOT EXISTS connections_board_idx ON connections(board_id);
+
+    CREATE TABLE IF NOT EXISTS note_items (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      text TEXT NOT NULL DEFAULT '',
+      revealed INTEGER NOT NULL DEFAULT 0,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS note_items_card_idx ON note_items(card_id);
   `);
 }

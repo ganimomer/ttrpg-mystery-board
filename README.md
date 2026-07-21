@@ -83,9 +83,14 @@ Discord later.
    handwritten note, upload a photo, tilt it, and flip **Hidden ↔ Revealed**.
 3. **Tie a string:** click a card's thumbtack, then another card's thumbtack. Select
    the string to label it, colour it, or reveal it.
-4. **Invite players:** click **Invite players**, copy the link, share it. Players
+4. **Notepad:** a card can carry a lined-yellow **notepad** of tidbits tucked under
+   the Polaroid with its edge peeking out. Click the peek to pull it open; as GM add
+   lines and reveal them individually (or hit **Reveal next**). A revealed tidbit
+   jumps to the bottom of the revealed block, so players read them in reveal order —
+   and un-revealed tidbit text never leaves the server.
+5. **Invite players:** click **Invite players**, copy the link, share it. Players
    sign in with Discord and are added to that board as viewers.
-5. During the session, select an item and hit the reveal toggle — it pops onto every
+6. During the session, select an item and hit the reveal toggle — it pops onto every
    player's board live.
 
 ## Production build

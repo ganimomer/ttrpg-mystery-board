@@ -118,3 +118,23 @@ export const connections = sqliteTable(
   },
   (t) => [index("connections_board_idx").on(t.boardId)],
 );
+
+export const noteItems = sqliteTable(
+  "note_items",
+  {
+    id: text("id").primaryKey(),
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => boards.id, { onDelete: "cascade" }),
+    text: text("text").notNull().default(""),
+    revealed: integer("revealed", { mode: "boolean" }).notNull().default(false),
+    position: integer("position").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [index("note_items_card_idx").on(t.cardId)],
+);

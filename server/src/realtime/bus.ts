@@ -1,4 +1,5 @@
 import type { BoardEvent, Card, Connection, Role } from "@board/shared";
+import { shapeCardForRole } from "../reveal.js";
 
 interface Subscriber {
   role: Role;
@@ -37,7 +38,12 @@ function fanout(boardId: string, forRole: (sub: Subscriber) => BoardEvent | null
  */
 export function publishCardUpsert(card: Card): void {
   fanout(card.boardId, (sub) => {
-    if (sub.role === "gm" || card.revealed) return { type: "card.upserted", card };
+    if (sub.role === "gm") return { type: "card.upserted", card };
+    // Players get the card (notepad stripped of un-revealed tidbits) only while
+    // it is revealed; otherwise a removal so a now-hidden card disappears.
+    if (card.revealed) {
+      return { type: "card.upserted", card: shapeCardForRole(card, "player") };
+    }
     return { type: "card.removed", cardId: card.id };
   });
 }

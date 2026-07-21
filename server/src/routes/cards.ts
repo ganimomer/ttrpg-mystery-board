@@ -4,8 +4,8 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { requireBoardGM, requireBoardMember } from "../access.js";
 import { requireAuth } from "../auth/session.js";
+import { loadCardWithNotepad } from "../cards.js";
 import { db, schema } from "../db/index.js";
-import { toCard } from "../mappers.js";
 import {
   publishCardRemove,
   publishCardUpsert,
@@ -71,9 +71,7 @@ cardsRoutes.post("/", requireBoardGM, async (c) => {
     })
     .run();
 
-  const card = toCard(
-    db.select().from(schema.cards).where(eq(schema.cards.id, id)).get()!,
-  );
+  const card = loadCardWithNotepad(id)!;
   publishCardUpsert(card);
   return c.json(card, 201);
 });
@@ -109,9 +107,7 @@ cardsRoutes.patch("/:cardId", requireBoardGM, async (c) => {
     .where(eq(schema.cards.id, cardId))
     .run();
 
-  const card = toCard(
-    db.select().from(schema.cards).where(eq(schema.cards.id, cardId)).get()!,
-  );
+  const card = loadCardWithNotepad(cardId)!;
   publishCardUpsert(card);
   return c.json(card);
 });

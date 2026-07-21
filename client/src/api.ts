@@ -6,11 +6,13 @@ import type {
   CreateBoardInput,
   CreateCardInput,
   CreateConnectionInput,
+  CreateTidbitInput,
   ImageMeta,
   Invite,
   Me,
   UpdateCardInput,
   UpdateConnectionInput,
+  UpdateTidbitInput,
 } from "@board/shared";
 
 class ApiError extends Error {
@@ -95,6 +97,27 @@ export const api = {
     }),
   deleteConnection: (boardId: string, connectionId: string) =>
     req<{ ok: true }>(`/boards/${boardId}/connections/${connectionId}`, {
+      method: "DELETE",
+    }),
+
+  // Notepad tidbits. Each call returns the parent card with its updated notepad.
+  addTidbit: (boardId: string, cardId: string, input: CreateTidbitInput) =>
+    req<Card>(`/boards/${boardId}/cards/${cardId}/tidbits`, {
+      method: "POST",
+      json: input,
+    }),
+  updateTidbit: (
+    boardId: string,
+    cardId: string,
+    tidbitId: string,
+    input: UpdateTidbitInput,
+  ) =>
+    req<Card>(`/boards/${boardId}/cards/${cardId}/tidbits/${tidbitId}`, {
+      method: "PATCH",
+      json: input,
+    }),
+  deleteTidbit: (boardId: string, cardId: string, tidbitId: string) =>
+    req<Card>(`/boards/${boardId}/cards/${cardId}/tidbits/${tidbitId}`, {
       method: "DELETE",
     }),
 

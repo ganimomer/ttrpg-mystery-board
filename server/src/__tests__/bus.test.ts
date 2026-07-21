@@ -23,6 +23,7 @@ function card(revealed: boolean): Card {
     y: 0,
     rotation: 0,
     revealed,
+    notepad: [],
   };
 }
 
@@ -93,6 +94,34 @@ describe("realtime bus reveal filtering", () => {
       type: "card.removed",
       cardId: "card1",
     });
+    offGm();
+    offPlayer();
+  });
+
+  it("strips un-revealed notepad tidbits from a player's card upsert", () => {
+    const gm = collector();
+    const player = collector();
+    const offGm = subscribe("board1", { role: "gm", send: gm.send });
+    const offPlayer = subscribe("board1", { role: "player", send: player.send });
+
+    const revealedCard: Card = {
+      ...card(true),
+      notepad: [
+        { id: "t1", text: "public clue", revealed: true },
+        { id: "t2", text: "hidden secret", revealed: false },
+      ],
+    };
+    publishCardUpsert(revealedCard);
+
+    const gmEvent = gm.events[0];
+    const playerEvent = player.events[0];
+    if (gmEvent.type !== "card.upserted" || playerEvent.type !== "card.upserted") {
+      throw new Error("expected card.upserted events");
+    }
+    expect(gmEvent.card.notepad).toHaveLength(2);
+    expect(playerEvent.card.notepad.map((t) => t.id)).toEqual(["t1"]);
+    expect(JSON.stringify(player.events)).not.toContain("hidden secret");
+
     offGm();
     offPlayer();
   });

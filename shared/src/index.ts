@@ -21,6 +21,13 @@ export interface Board {
   role: Role; // the requesting user's role on this board
 }
 
+/** A single line on a card's notepad, revealed to players one at a time. */
+export interface Tidbit {
+  id: string;
+  text: string;
+  revealed: boolean;
+}
+
 /** A Polaroid card pinned to the board. */
 export interface Card {
   id: string;
@@ -32,6 +39,9 @@ export interface Card {
   y: number;
   rotation: number; // degrees
   revealed: boolean;
+  // Lined-notepaper tidbits tucked under the Polaroid. Ordered; the server
+  // returns this already role-filtered (players get only revealed tidbits).
+  notepad: Tidbit[];
 }
 
 /** A string tied between two cards, denoting a relationship. */
@@ -83,6 +93,12 @@ export interface CreateConnectionInput {
 export type UpdateConnectionInput = Partial<
   Pick<Connection, "label" | "color" | "revealed">
 >;
+
+export interface CreateTidbitInput {
+  text?: string;
+}
+
+export type UpdateTidbitInput = Partial<Pick<Tidbit, "text" | "revealed">>;
 
 export interface ImageMeta {
   id: string;

@@ -34,7 +34,13 @@ export function BoardView({ boardId, onExit }: Props) {
       return { cards: state.cards, connections: state.connections };
     }
     const cards: Record<string, Card> = {};
-    for (const c of Object.values(state.cards)) if (c.revealed) cards[c.id] = c;
+    for (const c of Object.values(state.cards)) {
+      // Mirror the server's player shaping: hide the card and strip its
+      // un-revealed notepad tidbits so the preview matches what players see.
+      if (c.revealed) {
+        cards[c.id] = { ...c, notepad: c.notepad.filter((t) => t.revealed) };
+      }
+    }
     const connections: Record<string, Connection> = {};
     for (const c of Object.values(state.connections)) {
       if (c.revealed && cards[c.fromCardId] && cards[c.toCardId]) {
@@ -159,6 +165,7 @@ export function BoardView({ boardId, onExit }: Props) {
 
       <div className="board-stage">
         <Board
+          boardId={boardId}
           cards={cards}
           connections={connections}
           editable={editable}
