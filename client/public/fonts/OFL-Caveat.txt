@@ -1,0 +1,7 @@
+Caveat is designed by Impallari Type and is licensed under the SIL Open Font
+License, Version 1.1 (https://scripts.sil.org/OFL).
+
+Source: Google Fonts — https://fonts.google.com/specimen/Caveat
+The bundled Caveat.woff2 is redistributed here under the OFL. You may replace it
+with any handwriting font of your choosing; the app falls back to a system
+cursive stack if the file is absent.
