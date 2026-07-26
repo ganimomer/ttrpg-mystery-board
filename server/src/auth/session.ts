@@ -38,21 +38,21 @@ function readToken(c: Context): string | null {
   return getCookie(c, COOKIE) ?? null;
 }
 
-function getSessionUser(c: Context): User | null {
+async function getSessionUser(c: Context): Promise<User | null> {
   const userId = verifySession(readToken(c));
   if (!userId) return null;
-  const row = db
+  const [row] = await db
     .select()
     .from(schema.users)
     .where(eq(schema.users.id, userId))
-    .get();
+    .limit(1);
   if (!row) return null;
   return { id: row.id, username: row.username, avatar: row.avatar };
 }
 
 /** Populates c.var.user or returns 401. */
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const user = getSessionUser(c);
+  const user = await getSessionUser(c);
   if (!user) return c.json({ error: "Not authenticated" }, 401);
   c.set("user", user);
   await next();
@@ -60,7 +60,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
 
 /** Populates c.var.user if present, but never blocks. */
 export const optionalAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const user = getSessionUser(c);
+  const user = await getSessionUser(c);
   if (user) c.set("user", user);
   await next();
 };

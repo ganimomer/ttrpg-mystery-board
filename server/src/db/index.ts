@@ -1,41 +1,40 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { config } from "../config.js";
 import * as schema from "./schema.js";
 
-const sqlite = new Database(config.dbPath);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
-
-export const db = drizzle(sqlite, { schema });
+// One shared Postgres. postgres.js connects lazily (first query), so importing
+// this module never opens a socket — offline unit tests stay offline.
+export const sql = postgres(config.databaseUrl);
+export const db = drizzle(sql, { schema });
 export { schema };
 
 /**
- * Idempotent schema bootstrap. Kept in lock-step with schema.ts. For a
- * single-GM SQLite tool this is simpler and more transparent than a
- * migration runner; swap to drizzle-kit migrations if the schema grows.
+ * Idempotent schema bootstrap, kept in lock-step with schema.ts. Simpler and
+ * more transparent than a migration runner for this app; swap to drizzle-kit
+ * migrations if the schema grows. Safe to run on every boot / every instance.
  */
-export function bootstrapSchema(): void {
-  sqlite.exec(`
+export async function bootstrapSchema(): Promise<void> {
+  await sql.unsafe(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL,
       avatar TEXT,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS boards (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       owner_id TEXT NOT NULL REFERENCES users(id),
-      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS board_members (
       board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
       user_id TEXT NOT NULL REFERENCES users(id),
       role TEXT NOT NULL,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (board_id, user_id)
     );
 
@@ -43,19 +42,8 @@ export function bootstrapSchema(): void {
       token TEXT PRIMARY KEY,
       board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
       created_by TEXT NOT NULL REFERENCES users(id),
-      expires_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
-    );
-
-    CREATE TABLE IF NOT EXISTS images (
-      id TEXT PRIMARY KEY,
-      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-      filename TEXT NOT NULL,
-      mime TEXT NOT NULL,
-      width INTEGER NOT NULL,
-      height INTEGER NOT NULL,
-      uploaded_by TEXT NOT NULL REFERENCES users(id),
-      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS cards (
@@ -63,14 +51,16 @@ export function bootstrapSchema(): void {
       board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
       title TEXT NOT NULL DEFAULT '',
       note TEXT NOT NULL DEFAULT '',
-      image_id TEXT REFERENCES images(id),
+      image_url TEXT,
       x INTEGER NOT NULL DEFAULT 0,
       y INTEGER NOT NULL DEFAULT 0,
       rotation INTEGER NOT NULL DEFAULT 0,
-      revealed INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      revealed BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS cards_board_idx ON cards(board_id);
+    -- Upgrade path from the pre-URL schema (harmless if the column exists).
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS image_url TEXT;
 
     CREATE TABLE IF NOT EXISTS connections (
       id TEXT PRIMARY KEY,
@@ -79,8 +69,8 @@ export function bootstrapSchema(): void {
       to_card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
       label TEXT NOT NULL DEFAULT '',
       color TEXT NOT NULL DEFAULT '#c0392b',
-      revealed INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      revealed BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS connections_board_idx ON connections(board_id);
 
@@ -89,9 +79,9 @@ export function bootstrapSchema(): void {
       card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
       board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
       text TEXT NOT NULL DEFAULT '',
-      revealed INTEGER NOT NULL DEFAULT 0,
+      revealed BOOLEAN NOT NULL DEFAULT false,
       position INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS note_items_card_idx ON note_items(card_id);
   `);

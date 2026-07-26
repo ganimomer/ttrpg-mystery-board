@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getSignedCookie, setSignedCookie, deleteCookie } from "hono/cookie";
 import { nanoid } from "nanoid";
 import type { Me } from "@board/shared";
-import { config, isGameMaster } from "../config.js";
+import { config } from "../config.js";
 import { db, schema } from "../db/index.js";
 import type { AppEnv } from "../types.js";
 import { clearSession, requireAuth, setSession } from "./session.js";
@@ -53,17 +53,14 @@ async function upsertDiscordUser(accessToken: string): Promise<Me | null> {
   if (!userRes.ok) return null;
   const profile = (await userRes.json()) as DiscordProfile;
   const username = profile.global_name || profile.username;
-  db.insert(schema.users)
+  await db
+    .insert(schema.users)
     .values({ id: profile.id, username, avatar: profile.avatar })
     .onConflictDoUpdate({
       target: schema.users.id,
       set: { username, avatar: profile.avatar },
-    })
-    .run();
-  return {
-    user: { id: profile.id, username, avatar: profile.avatar },
-    isGameMaster: isGameMaster(profile.id),
-  };
+    });
+  return { user: { id: profile.id, username, avatar: profile.avatar } };
 }
 
 export const authRoutes = new Hono<AppEnv>();
@@ -131,7 +128,6 @@ authRoutes.post("/discord/token", async (c) => {
     access_token: accessToken,
     token: signSession(me.user.id),
     user: me.user,
-    isGameMaster: me.isGameMaster,
   });
 });
 
@@ -142,6 +138,6 @@ authRoutes.post("/logout", (c) => {
 
 authRoutes.get("/me", requireAuth, (c) => {
   const user = c.get("user");
-  const me: Me = { user, isGameMaster: isGameMaster(user.id) };
+  const me: Me = { user };
   return c.json(me);
 });

@@ -3,7 +3,7 @@ import { streamSSE } from "hono/streaming";
 import type { BoardEvent } from "@board/shared";
 import { requireBoardMember } from "../access.js";
 import { requireAuth } from "../auth/session.js";
-import { subscribe } from "../realtime/bus.js";
+import { subscribe } from "../realtime/subscribers.js";
 import type { AppEnv } from "../types.js";
 
 export const eventsRoutes = new Hono<AppEnv>();

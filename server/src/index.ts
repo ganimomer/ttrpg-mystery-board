@@ -8,16 +8,17 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { config } from "./config.js";
 import { bootstrapSchema } from "./db/index.js";
+import { startListening } from "./realtime/bus.js";
 import { authRoutes } from "./auth/discord.js";
 import { boardsRoutes, invitesRoutes } from "./routes/boards.js";
 import { cardsRoutes } from "./routes/cards.js";
 import { connectionsRoutes } from "./routes/connections.js";
 import { tidbitsRoutes } from "./routes/tidbits.js";
 import { eventsRoutes } from "./routes/events.js";
-import { imageServeRoutes, imageUploadRoutes } from "./routes/images.js";
 import type { AppEnv } from "./types.js";
 
-bootstrapSchema();
+await bootstrapSchema();
+await startListening();
 
 const app = new Hono<AppEnv>();
 app.use("*", logger());
@@ -31,9 +32,7 @@ api.route("/boards", boardsRoutes);
 api.route("/boards/:boardId/cards", cardsRoutes);
 api.route("/boards/:boardId/cards/:cardId/tidbits", tidbitsRoutes);
 api.route("/boards/:boardId/connections", connectionsRoutes);
-api.route("/boards/:boardId/images", imageUploadRoutes);
 api.route("/boards/:boardId/events", eventsRoutes);
-api.route("/images", imageServeRoutes);
 app.route("/api", api);
 
 // ─── Static client (production) ──────────────────────────────────

@@ -1,73 +1,91 @@
-import type { BoardEvent, Card, Connection, Role } from "@board/shared";
-import { shapeCardForRole } from "../reveal.js";
+import type { Card, Connection } from "@board/shared";
+import { loadCardWithNotepad, loadConnection } from "../cards.js";
+import { sql } from "../db/index.js";
+import {
+  deliverBoardRenamed,
+  deliverCardRemove,
+  deliverCardUpsert,
+  deliverConnectionRemove,
+  deliverConnectionUpsert,
+} from "./subscribers.js";
 
-interface Subscriber {
-  role: Role;
-  send: (event: BoardEvent) => void;
+// Cross-instance event bus over Postgres LISTEN/NOTIFY. Publishers emit a tiny
+// *pointer* (never content) on the `board_events` channel; every instance —
+// including the origin — receives it, re-reads the entity, and delivers a
+// role-shaped event to its own SSE subscribers. Keeping content off the wire
+// stays well under NOTIFY's ~8 KB limit and preserves the reveal invariant
+// (hidden data is only ever filtered in per-subscriber, before it reaches a
+// browser).
+
+const CHANNEL = "board_events";
+
+type Pointer =
+  | { t: "card"; boardId: string; id: string }
+  | { t: "card_rm"; boardId: string; id: string }
+  | { t: "conn"; boardId: string; id: string }
+  | { t: "conn_rm"; boardId: string; id: string }
+  | { t: "board_rename"; boardId: string; name: string };
+
+async function notify(p: Pointer): Promise<void> {
+  await sql.notify(CHANNEL, JSON.stringify(p));
 }
 
-// boardId -> set of live subscribers
-const rooms = new Map<string, Set<Subscriber>>();
-
-export function subscribe(boardId: string, sub: Subscriber): () => void {
-  let set = rooms.get(boardId);
-  if (!set) {
-    set = new Set();
-    rooms.set(boardId, set);
-  }
-  set.add(sub);
-  return () => {
-    set!.delete(sub);
-    if (set!.size === 0) rooms.delete(boardId);
-  };
+export function publishCardUpsert(card: Card): Promise<void> {
+  return notify({ t: "card", boardId: card.boardId, id: card.id });
 }
 
-function fanout(boardId: string, forRole: (sub: Subscriber) => BoardEvent | null) {
-  const set = rooms.get(boardId);
-  if (!set) return;
-  for (const sub of set) {
-    const event = forRole(sub);
-    if (event) sub.send(event);
-  }
+export function publishCardRemove(boardId: string, cardId: string): Promise<void> {
+  return notify({ t: "card_rm", boardId, id: cardId });
 }
 
-/**
- * Reveal-aware broadcast of a card upsert. The GM sees the real state; a
- * player receives the card only if it is revealed, otherwise a `removed`
- * event so a previously-revealed-now-hidden card disappears from their board.
- */
-export function publishCardUpsert(card: Card): void {
-  fanout(card.boardId, (sub) => {
-    if (sub.role === "gm") return { type: "card.upserted", card };
-    // Players get the card (notepad stripped of un-revealed tidbits) only while
-    // it is revealed; otherwise a removal so a now-hidden card disappears.
-    if (card.revealed) {
-      return { type: "card.upserted", card: shapeCardForRole(card, "player") };
-    }
-    return { type: "card.removed", cardId: card.id };
-  });
-}
-
-export function publishCardRemove(boardId: string, cardId: string): void {
-  fanout(boardId, () => ({ type: "card.removed", cardId }));
-}
-
-export function publishConnectionUpsert(connection: Connection): void {
-  fanout(connection.boardId, (sub) => {
-    if (sub.role === "gm" || connection.revealed) {
-      return { type: "connection.upserted", connection };
-    }
-    return { type: "connection.removed", connectionId: connection.id };
-  });
+export function publishConnectionUpsert(connection: Connection): Promise<void> {
+  return notify({ t: "conn", boardId: connection.boardId, id: connection.id });
 }
 
 export function publishConnectionRemove(
   boardId: string,
   connectionId: string,
-): void {
-  fanout(boardId, () => ({ type: "connection.removed", connectionId }));
+): Promise<void> {
+  return notify({ t: "conn_rm", boardId, id: connectionId });
 }
 
-export function publishBoardRenamed(boardId: string, name: string): void {
-  fanout(boardId, () => ({ type: "board.renamed", name }));
+export function publishBoardRenamed(boardId: string, name: string): Promise<void> {
+  return notify({ t: "board_rename", boardId, name });
+}
+
+async function handle(p: Pointer): Promise<void> {
+  switch (p.t) {
+    case "card": {
+      const card = await loadCardWithNotepad(p.id);
+      if (card) deliverCardUpsert(card);
+      else deliverCardRemove(p.boardId, p.id); // deleted meanwhile
+      break;
+    }
+    case "card_rm":
+      deliverCardRemove(p.boardId, p.id);
+      break;
+    case "conn": {
+      const conn = await loadConnection(p.id);
+      if (conn) deliverConnectionUpsert(conn);
+      else deliverConnectionRemove(p.boardId, p.id);
+      break;
+    }
+    case "conn_rm":
+      deliverConnectionRemove(p.boardId, p.id);
+      break;
+    case "board_rename":
+      deliverBoardRenamed(p.boardId, p.name);
+      break;
+  }
+}
+
+/** Begin listening for board events. Call once at server boot. */
+export async function startListening(): Promise<void> {
+  await sql.listen(CHANNEL, (payload) => {
+    try {
+      void handle(JSON.parse(payload) as Pointer);
+    } catch (err) {
+      console.error("Bad board_events payload:", err);
+    }
+  });
 }

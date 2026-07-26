@@ -20,13 +20,13 @@ const updateSchema = z.object({
   revealed: z.boolean().optional(),
 });
 
-// Confirm the card exists on this board; returns it or null.
-function cardOnBoard(cardId: string, boardId: string) {
-  return db
+async function cardOnBoard(cardId: string, boardId: string) {
+  const [row] = await db
     .select({ id: schema.cards.id })
     .from(schema.cards)
     .where(and(eq(schema.cards.id, cardId), eq(schema.cards.boardId, boardId)))
-    .get();
+    .limit(1);
+  return row;
 }
 
 function currentItems(cardId: string) {
@@ -34,44 +34,32 @@ function currentItems(cardId: string) {
     .select({ id: schema.noteItems.id, revealed: schema.noteItems.revealed })
     .from(schema.noteItems)
     .where(eq(schema.noteItems.cardId, cardId))
-    .orderBy(asc(schema.noteItems.position))
-    .all();
-}
-
-function persistOrder(items: { id: string }[]) {
-  items.forEach((item, i) => {
-    db.update(schema.noteItems)
-      .set({ position: i })
-      .where(eq(schema.noteItems.id, item.id))
-      .run();
-  });
+    .orderBy(asc(schema.noteItems.position));
 }
 
 // Add a tidbit (appended below existing items, un-revealed).
 tidbitsRoutes.post("/", requireBoardGM, async (c) => {
   const boardId = c.get("boardId");
   const cardId = c.req.param("cardId")!;
-  if (!cardOnBoard(cardId, boardId)) {
+  if (!(await cardOnBoard(cardId, boardId))) {
     return c.json({ error: "Card not found" }, 404);
   }
   const body = await c.req.json().catch(() => ({}));
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "Invalid tidbit" }, 400);
 
-  const position = currentItems(cardId).length;
-  db.insert(schema.noteItems)
-    .values({
-      id: nanoid(),
-      cardId,
-      boardId,
-      text: parsed.data.text ?? "",
-      revealed: false,
-      position,
-    })
-    .run();
+  const position = (await currentItems(cardId)).length;
+  await db.insert(schema.noteItems).values({
+    id: nanoid(),
+    cardId,
+    boardId,
+    text: parsed.data.text ?? "",
+    revealed: false,
+    position,
+  });
 
-  const card = loadCardWithNotepad(cardId)!;
-  publishCardUpsert(card);
+  const card = (await loadCardWithNotepad(cardId))!;
+  await publishCardUpsert(card);
   return c.json(card, 201);
 });
 
@@ -81,7 +69,7 @@ tidbitsRoutes.patch("/:tidbitId", requireBoardGM, async (c) => {
   const cardId = c.req.param("cardId")!;
   const tidbitId = c.req.param("tidbitId")!;
 
-  const existing = db
+  const [existing] = await db
     .select()
     .from(schema.noteItems)
     .where(
@@ -91,51 +79,53 @@ tidbitsRoutes.patch("/:tidbitId", requireBoardGM, async (c) => {
         eq(schema.noteItems.boardId, boardId),
       ),
     )
-    .get();
+    .limit(1);
   if (!existing) return c.json({ error: "Tidbit not found" }, 404);
 
   const body = await c.req.json().catch(() => ({}));
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "Invalid update" }, 400);
   const d = parsed.data;
+  const revealChanged =
+    d.revealed !== undefined && d.revealed !== existing.revealed;
+  // Read the committed order up front; reorderOnReveal derives the new order
+  // from the *other* items' revealed flags, so a pre-update read is correct.
+  const reordered = revealChanged
+    ? reorderOnReveal(await currentItems(cardId), tidbitId, d.revealed!)
+    : null;
 
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     if (d.text !== undefined) {
-      tx.update(schema.noteItems)
+      await tx
+        .update(schema.noteItems)
         .set({ text: d.text })
-        .where(eq(schema.noteItems.id, tidbitId))
-        .run();
+        .where(eq(schema.noteItems.id, tidbitId));
     }
-    if (d.revealed !== undefined && d.revealed !== existing.revealed) {
-      tx.update(schema.noteItems)
-        .set({ revealed: d.revealed })
-        .where(eq(schema.noteItems.id, tidbitId))
-        .run();
-      const reordered = reorderOnReveal(
-        currentItems(cardId),
-        tidbitId,
-        d.revealed,
-      );
-      reordered.forEach((item, i) => {
-        tx.update(schema.noteItems)
+    if (reordered) {
+      await tx
+        .update(schema.noteItems)
+        .set({ revealed: d.revealed! })
+        .where(eq(schema.noteItems.id, tidbitId));
+      for (const [i, item] of reordered.entries()) {
+        await tx
+          .update(schema.noteItems)
           .set({ position: i })
-          .where(eq(schema.noteItems.id, item.id))
-          .run();
-      });
+          .where(eq(schema.noteItems.id, item.id));
+      }
     }
   });
 
-  const card = loadCardWithNotepad(cardId)!;
-  publishCardUpsert(card);
+  const card = (await loadCardWithNotepad(cardId))!;
+  await publishCardUpsert(card);
   return c.json(card);
 });
 
-tidbitsRoutes.delete("/:tidbitId", requireBoardGM, (c) => {
+tidbitsRoutes.delete("/:tidbitId", requireBoardGM, async (c) => {
   const boardId = c.get("boardId");
   const cardId = c.req.param("cardId")!;
   const tidbitId = c.req.param("tidbitId")!;
 
-  const existing = db
+  const [existing] = await db
     .select({ id: schema.noteItems.id })
     .from(schema.noteItems)
     .where(
@@ -145,13 +135,20 @@ tidbitsRoutes.delete("/:tidbitId", requireBoardGM, (c) => {
         eq(schema.noteItems.boardId, boardId),
       ),
     )
-    .get();
+    .limit(1);
   if (!existing) return c.json({ error: "Tidbit not found" }, 404);
 
-  db.delete(schema.noteItems).where(eq(schema.noteItems.id, tidbitId)).run();
-  persistOrder(currentItems(cardId)); // densify positions after removal
+  await db.delete(schema.noteItems).where(eq(schema.noteItems.id, tidbitId));
+  // Densify positions after removal.
+  const remaining = await currentItems(cardId);
+  for (const [i, item] of remaining.entries()) {
+    await db
+      .update(schema.noteItems)
+      .set({ position: i })
+      .where(eq(schema.noteItems.id, item.id));
+  }
 
-  const card = loadCardWithNotepad(cardId)!;
-  publishCardUpsert(card);
+  const card = (await loadCardWithNotepad(cardId))!;
+  await publishCardUpsert(card);
   return c.json(card);
 });

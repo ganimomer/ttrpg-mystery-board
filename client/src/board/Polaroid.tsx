@@ -1,6 +1,5 @@
 import { useRef } from "react";
 import type { Card } from "@board/shared";
-import { api } from "../api";
 import { CARD_HEIGHT, CARD_WIDTH } from "./layout";
 import { Thumbtack } from "./Thumbtack";
 
@@ -128,11 +127,14 @@ export function Polaroid({
         </button>
 
         <div className="polaroid-photo">
-          {card.imageId ? (
+          {card.imageUrl ? (
             <img
-              src={api.imageUrl(card.imageId)}
+              src={card.imageUrl}
               alt={card.title}
               draggable={false}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
             />
           ) : (
             <div className="polaroid-photo-empty">no photo</div>

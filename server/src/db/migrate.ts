@@ -1,7 +1,8 @@
-// Standalone entrypoint to create/upgrade the SQLite schema.
+// Standalone entrypoint to create/upgrade the Postgres schema.
 // Usage: npm run db:migrate
 import "../env.js";
-import { bootstrapSchema } from "./index.js";
+import { bootstrapSchema, sql } from "./index.js";
 
-bootstrapSchema();
+await bootstrapSchema();
 console.log("Schema is up to date.");
+await sql.end();

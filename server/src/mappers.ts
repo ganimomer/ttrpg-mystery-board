@@ -15,7 +15,7 @@ export function toCard(row: CardRow, notepad: Tidbit[] = []): Card {
     boardId: row.boardId,
     title: row.title,
     note: row.note,
-    imageId: row.imageId,
+    imageUrl: row.imageUrl,
     x: row.x,
     y: row.y,
     rotation: row.rotation,

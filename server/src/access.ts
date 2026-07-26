@@ -4,8 +4,11 @@ import type { Role } from "@board/shared";
 import { db, schema } from "./db/index.js";
 import type { AppEnv } from "./types.js";
 
-export function getMembership(boardId: string, userId: string): Role | null {
-  const row = db
+export async function getMembership(
+  boardId: string,
+  userId: string,
+): Promise<Role | null> {
+  const [row] = await db
     .select({ role: schema.boardMembers.role })
     .from(schema.boardMembers)
     .where(
@@ -14,7 +17,7 @@ export function getMembership(boardId: string, userId: string): Role | null {
         eq(schema.boardMembers.userId, userId),
       ),
     )
-    .get();
+    .limit(1);
   return row?.role ?? null;
 }
 
@@ -30,7 +33,7 @@ export const requireBoardMember: MiddlewareHandler<AppEnv> = async (
   const boardId = c.req.param("boardId");
   if (!boardId) return c.json({ error: "Board not specified" }, 400);
   const user = c.get("user");
-  const role = getMembership(boardId, user.id);
+  const role = await getMembership(boardId, user.id);
   if (!role) return c.json({ error: "Not a member of this board" }, 403);
   c.set("boardId", boardId);
   c.set("role", role);
