@@ -372,7 +372,8 @@ textarea.note-input {
   opacity: 0.55;
   filter: grayscale(0.4);
 }
-.card.is-hidden .card-inner::after {
+.card.is-hidden .card-inner::after,
+.card.is-hidden .card-sheet-face::after {
   content: "hidden";
   position: absolute;
   top: 8px;
@@ -456,11 +457,6 @@ textarea.note-input {
   object-fit: cover;
   display: block;
 }
-.card-photo-empty {
-  font-family: var(--hand);
-  font-size: 20px;
-  color: #b3a889;
-}
 .card-caption {
   padding: 8px 4px 12px;
   text-align: center;
@@ -482,6 +478,138 @@ textarea.note-input {
 }
 .card-note--muted {
   color: #c1b79c;
+}
+
+/* ─── Note sheet (a card with no photo) ────────────────────────── */
+/* Warm foolscap rather than the polaroid's cool print stock, ripped along the
+   bottom. `.card-sheet` stays unclipped so its ::before can carry a paler
+   fiber layer that shows through the bites; the face on top is clipped by the
+   seeded polygon from tear.ts. Both polygons arrive as inline custom props.
+   The shadow belongs to the wrapper, not the clipped layers: `clip-path` is
+   applied *after* `filter`, so a shadow on a clipped element is cut away with
+   the rest of the box. From out here it traces the whole torn silhouette. */
+.card-sheet {
+  position: relative;
+  min-height: 110px;
+  filter: drop-shadow(0 9px 14px rgba(0, 0, 0, 0.42));
+  transition: filter 0.15s ease;
+}
+/* The selection ring is four hard offset shadows rather than a box-shadow ring,
+   which would be a rectangle around a torn card. */
+.card.is-selected .card-sheet {
+  filter: drop-shadow(2px 0 0 var(--accent)) drop-shadow(-2px 0 0 var(--accent))
+    drop-shadow(0 2px 0 var(--accent)) drop-shadow(0 -2px 0 var(--accent))
+    drop-shadow(0 12px 18px rgba(0, 0, 0, 0.5));
+}
+.card.is-connect-target .card-sheet {
+  filter: drop-shadow(2px 0 0 #2d9c5a) drop-shadow(-2px 0 0 #2d9c5a)
+    drop-shadow(0 2px 0 #2d9c5a) drop-shadow(0 -2px 0 #2d9c5a)
+    drop-shadow(0 12px 18px rgba(0, 0, 0, 0.5));
+}
+.card-sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 -5px 0;
+  z-index: 0;
+  background: #fbf3e0;
+  clip-path: var(--tear-fiber);
+}
+.card-sheet-face {
+  position: relative;
+  z-index: 1;
+  padding: 16px 16px 26px;
+  color: #33302a;
+  background-color: #f2e9d3;
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5),
+    rgba(255, 255, 255, 0) 42%,
+    rgba(150, 120, 70, 0.09)
+  );
+  clip-path: var(--tear-face);
+}
+.card-sheet-title {
+  display: inline-block;
+  position: relative;
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  font-family: var(--hand);
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: #2f3b47;
+}
+/* Ruled by hand, not by text-decoration: it overshoots and sits slightly off. */
+.card-sheet-title::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -5px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(47, 59, 71, 0.55);
+  transform: rotate(-0.7deg);
+}
+.card-sheet-body {
+  margin: 0;
+  font-family: var(--hand);
+  font-size: 17px;
+  line-height: 1.2;
+  color: #3a4653;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* A 2000-character note must not grow into a board-sized sheet; the full
+     text stays readable and editable in the inspector. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 9;
+  overflow: hidden;
+}
+.card-sheet-body--muted {
+  color: #b3a889;
+}
+.card-sheet-tidbits {
+  display: block;
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border: none;
+  border-top: 1px solid rgba(90, 74, 46, 0.28);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.card-sheet-tidbit {
+  display: block;
+  position: relative;
+  padding-left: 14px;
+  font-family: var(--hand);
+  font-size: 16px;
+  line-height: 1.15;
+  color: #4a4436;
+  overflow-wrap: anywhere;
+}
+.card-sheet-tidbit + .card-sheet-tidbit {
+  margin-top: 3px;
+}
+.card-sheet-tidbit::before {
+  content: "–";
+  position: absolute;
+  left: 0;
+  color: rgba(90, 74, 46, 0.6);
+}
+/* GM-only: a tidbit the players have not been shown yet. */
+.card-sheet-tidbit.is-hidden {
+  opacity: 0.5;
+}
+.card-sheet-tidbit--add {
+  color: #9a8f74;
+}
+.card-sheet-tidbits:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ─── Strings ──────────────────────────────────────────────────── */

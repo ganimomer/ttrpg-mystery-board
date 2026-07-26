@@ -1,6 +1,7 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import type { Card as CardData } from "@board/shared";
 import { CARD_HEIGHT, CARD_WIDTH } from "./layout";
+import { tearPaths } from "./tear";
 import { Thumbtack } from "./Thumbtack";
 
 interface Props {
@@ -39,7 +40,12 @@ export function Card({
 
   function onPointerDown(e: React.PointerEvent) {
     if (!editable) return;
-    if ((e.target as HTMLElement).closest(".tack-hit, .notepad-peek")) return;
+    if (
+      (e.target as HTMLElement).closest(
+        ".tack-hit, .notepad-peek, .card-sheet-tidbits",
+      )
+    )
+      return;
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     drag.current = {
@@ -73,11 +79,38 @@ export function Card({
   }
 
   const hasNotepad = card.notepad.length > 0;
+  // The photo decides the prop: with one the card is a pinned polaroid, without
+  // one it is a sheet of paper torn from a notebook.
+  const imageUrl = card.imageUrl;
+
+  // Deterministic per card, so the rip never shifts under a re-render.
+  const tear = useMemo(() => tearPaths(card.id), [card.id]);
+
+  const openNotepad = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onOpenNotepad(card.id);
+  };
+
+  const tack = (
+    <button
+      type="button"
+      className="tack-hit"
+      title={editable ? "Start / finish a string here" : undefined}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTackClick(card.id);
+      }}
+    >
+      <Thumbtack color={card.revealed ? "#d63031" : "#8d6e63"} />
+    </button>
+  );
 
   return (
     <div
       className={[
         "card",
+        imageUrl ? "" : "is-note",
         selected ? "is-selected" : "",
         connectArmed ? "is-connect-target" : "",
         card.revealed ? "" : "is-hidden",
@@ -89,24 +122,23 @@ export function Card({
         left: card.x,
         top: card.y,
         width: CARD_WIDTH,
-        height: CARD_HEIGHT,
+        // A sheet grows with what is written on it; a polaroid is a fixed print.
+        height: imageUrl ? CARD_HEIGHT : undefined,
         transform: `rotate(${card.rotation}deg)`,
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      {/* Lined yellow notepaper tucked behind the card, edge peeking below. */}
-      {(hasNotepad || editable) && (
+      {/* Lined yellow notepaper tucked behind the card, edge peeking below.
+          Sheets carry their tidbits on the page instead. */}
+      {imageUrl && (hasNotepad || editable) && (
         <button
           type="button"
           className="notepad-peek"
           title="Open notepad"
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenNotepad(card.id);
-          }}
+          onClick={openNotepad}
         >
           <span className="notepad-peek-count">
             {hasNotepad ? card.notepad.length : "+"}
@@ -114,42 +146,77 @@ export function Card({
         </button>
       )}
 
-      <div className="card-inner">
-        <button
-          type="button"
-          className="tack-hit"
-          title={editable ? "Start / finish a string here" : undefined}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onTackClick(card.id);
-          }}
-        >
-          <Thumbtack color={card.revealed ? "#d63031" : "#8d6e63"} />
-        </button>
-
-        <div className="card-photo">
-          {card.imageUrl ? (
+      {imageUrl ? (
+        <div className="card-inner">
+          {tack}
+          <div className="card-photo">
             <img
-              src={card.imageUrl}
+              src={imageUrl}
               alt={card.title}
               draggable={false}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}
             />
-          ) : (
-            <div className="card-photo-empty">no photo</div>
-          )}
+          </div>
+          <div className="card-caption">
+            {card.title && <div className="card-title">{card.title}</div>}
+            {card.note && <div className="card-note">{card.note}</div>}
+            {!card.title && !card.note && (
+              <div className="card-note card-note--muted">…</div>
+            )}
+          </div>
         </div>
-        <div className="card-caption">
-          {card.title && <div className="card-title">{card.title}</div>}
-          {card.note && <div className="card-note">{card.note}</div>}
-          {!card.title && !card.note && (
-            <div className="card-note card-note--muted">…</div>
-          )}
-        </div>
-      </div>
+      ) : (
+        <>
+          {/* The tack sits outside the sheet: it overhangs the top edge, where
+              the face's clip-path would slice it, and it must stay clear of the
+              wrapper's shadow and selection ring. */}
+          {tack}
+          <div
+            className="card-sheet"
+            style={
+              {
+                "--tear-face": tear.face,
+                "--tear-fiber": tear.fiber,
+              } as React.CSSProperties
+            }
+          >
+            <div className="card-sheet-face">
+              {card.title && <h3 className="card-sheet-title">{card.title}</h3>}
+              {card.note && <p className="card-sheet-body">{card.note}</p>}
+              {!card.title && !card.note && !hasNotepad && (
+                <p className="card-sheet-body card-sheet-body--muted">…</p>
+              )}
+              {(hasNotepad || editable) && (
+                <button
+                  type="button"
+                  className="card-sheet-tidbits"
+                  aria-label="Open notepad"
+                  title="Open notepad"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={openNotepad}
+                >
+                  {hasNotepad ? (
+                    card.notepad.map((t) => (
+                      <span
+                        key={t.id}
+                        className={`card-sheet-tidbit ${t.revealed ? "" : "is-hidden"}`}
+                      >
+                        {t.text}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="card-sheet-tidbit card-sheet-tidbit--add">
+                      + add a line
+                    </span>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
