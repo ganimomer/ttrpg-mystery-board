@@ -2,7 +2,7 @@
   "name": "ttrpg-mystery-board",
   "version": "0.1.0",
   "private": true,
-  "description": "A detective-style cork board for TTRPG campaigns — Polaroids, thumbtacks and strings, with GM-controlled reveals.",
+  "description": "A detective-style cork board for TTRPG campaigns — Cards, thumbtacks and strings, with GM-controlled reveals.",
   "type": "module",
   "workspaces": [
     "shared",

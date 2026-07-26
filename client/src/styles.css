@@ -334,14 +334,16 @@ textarea.note-input {
   pointer-events: none;
 }
 
-/* ─── Polaroid ─────────────────────────────────────────────────── */
-/* `.polaroid` is a transparent positioned/rotated container; `.polaroid-inner`
-   is the white card, painted above the notepad peek that hides behind it. */
-.polaroid {
+/* ─── Card ─────────────────────────────────────────────────────── */
+/* `.card` is a transparent positioned/rotated container; `.card-inner`
+   is the white card, painted above the notepad peek that hides behind it.
+   The z-index puts cards above the strings' click layer, below their art. */
+.card {
   position: absolute;
+  z-index: 1;
   user-select: none;
 }
-.polaroid-inner {
+.card-inner {
   position: relative;
   z-index: 1;
   width: 100%;
@@ -354,23 +356,23 @@ textarea.note-input {
   display: flex;
   flex-direction: column;
 }
-.polaroid.is-editable {
+.card.is-editable {
   cursor: grab;
 }
-.polaroid.is-editable:active {
+.card.is-editable:active {
   cursor: grabbing;
 }
-.polaroid.is-selected .polaroid-inner {
+.card.is-selected .card-inner {
   box-shadow: 0 0 0 3px var(--accent), 0 14px 26px rgba(0, 0, 0, 0.5);
 }
-.polaroid.is-connect-target .polaroid-inner {
+.card.is-connect-target .card-inner {
   box-shadow: 0 0 0 3px #2d9c5a, 0 14px 26px rgba(0, 0, 0, 0.5);
 }
-.polaroid.is-hidden {
+.card.is-hidden {
   opacity: 0.55;
   filter: grayscale(0.4);
 }
-.polaroid.is-hidden .polaroid-inner::after {
+.card.is-hidden .card-inner::after {
   content: "hidden";
   position: absolute;
   top: 8px;
@@ -384,7 +386,7 @@ textarea.note-input {
   border-radius: 4px;
 }
 
-/* Yellow lined notepaper peeking out from under the Polaroid. */
+/* Yellow lined notepaper peeking out from under the Card. */
 .notepad-peek {
   position: absolute;
   z-index: 0;
@@ -440,7 +442,7 @@ textarea.note-input {
 .thumbtack {
   filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.4));
 }
-.polaroid-photo {
+.card-photo {
   width: 100%;
   aspect-ratio: 1 / 1;
   background: #e9e4d6;
@@ -448,37 +450,37 @@ textarea.note-input {
   display: grid;
   place-items: center;
 }
-.polaroid-photo img {
+.card-photo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
-.polaroid-photo-empty {
+.card-photo-empty {
   font-family: var(--hand);
   font-size: 20px;
   color: #b3a889;
 }
-.polaroid-caption {
+.card-caption {
   padding: 8px 4px 12px;
   text-align: center;
   min-height: 46px;
 }
-.polaroid-title {
+.card-title {
   font-family: var(--hand);
   font-size: 22px;
   font-weight: 700;
   color: #23303e;
   line-height: 1.05;
 }
-.polaroid-note {
+.card-note {
   font-family: var(--hand);
   font-size: 17px;
   color: #3a4653;
   line-height: 1.1;
   white-space: pre-wrap;
 }
-.polaroid-note--muted {
+.card-note--muted {
   color: #c1b79c;
 }
 
@@ -489,6 +491,11 @@ textarea.note-input {
   top: 0;
   overflow: visible;
   pointer-events: none;
+}
+/* Visible strings hang in front of the cards; their click targets stay behind
+   them (default z-index) so a string can't cover the tack it hangs from. */
+.string-layer--art {
+  z-index: 2;
 }
 .string {
   fill: none;

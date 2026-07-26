@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import type { Card } from "@board/shared";
+import type { Card, Tidbit } from "@board/shared";
 import { api } from "../api";
+import { useCommittedField } from "./useCommittedField";
 
 interface Props {
   boardId: string;
@@ -51,37 +52,13 @@ export function NotepadOverlay({ boardId, card, editable, onClose }: Props) {
               className={`notepad-line ${t.revealed ? "is-revealed" : "is-hidden"}`}
             >
               {editable ? (
-                <>
-                  <button
-                    type="button"
-                    className={`line-eye ${t.revealed ? "is-on" : ""}`}
-                    title={t.revealed ? "Revealed to players" : "Hidden from players"}
-                    onClick={() => save(t.id, { revealed: !t.revealed })}
-                  >
-                    {t.revealed ? "👁" : "🚫"}
-                  </button>
-                  <input
-                    className="line-text"
-                    defaultValue={t.text}
-                    maxLength={2000}
-                    placeholder="a tidbit…"
-                    onBlur={(e) => {
-                      if (e.target.value !== t.text) save(t.id, { text: e.target.value });
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="line-del"
-                    title="Delete line"
-                    onClick={() =>
-                      void api
-                        .deleteTidbit(boardId, card.id, t.id)
-                        .catch(() => {})
-                    }
-                  >
-                    ×
-                  </button>
-                </>
+                <TidbitLine
+                  tidbit={t}
+                  onSave={(patch) => save(t.id, patch)}
+                  onDelete={() =>
+                    void api.deleteTidbit(boardId, card.id, t.id).catch(() => {})
+                  }
+                />
               ) : (
                 <span className="line-text-static">{t.text}</span>
               )}
@@ -113,5 +90,36 @@ export function NotepadOverlay({ boardId, card, editable, onClose }: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+/** One editable notepad line. Its own component so the text can commit on
+ *  unmount — closing the overlay (backdrop, ×, Escape) saves the edit. */
+function TidbitLine({
+  tidbit,
+  onSave,
+  onDelete,
+}: {
+  tidbit: Tidbit;
+  onSave: (patch: { text?: string; revealed?: boolean }) => void;
+  onDelete: () => void;
+}) {
+  const text = useCommittedField(tidbit.text, (value) => onSave({ text: value }));
+
+  return (
+    <>
+      <button
+        type="button"
+        className={`line-eye ${tidbit.revealed ? "is-on" : ""}`}
+        title={tidbit.revealed ? "Revealed to players" : "Hidden from players"}
+        onClick={() => onSave({ revealed: !tidbit.revealed })}
+      >
+        {tidbit.revealed ? "👁" : "🚫"}
+      </button>
+      <input {...text} className="line-text" maxLength={2000} placeholder="a tidbit…" />
+      <button type="button" className="line-del" title="Delete line" onClick={onDelete}>
+        ×
+      </button>
+    </>
   );
 }

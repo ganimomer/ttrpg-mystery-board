@@ -132,7 +132,7 @@ export function BoardView({ boardId, onExit }: Props) {
         {isGM && (
           <>
             <button className="btn" onClick={addCard} disabled={busy || previewAsPlayer}>
-              + Polaroid
+              + Card
             </button>
             <button className="btn" onClick={makeInvite}>Invite players</button>
             <label className="preview-switch">
@@ -186,7 +186,10 @@ export function BoardView({ boardId, onExit }: Props) {
 
         {editable && selectedCard && (
           <aside className="side-panel">
+            {/* Keyed so switching cards remounts the panel, which commits any
+                edit still sitting in a field. */}
             <CardInspector
+              key={selectedCard.id}
               boardId={boardId}
               card={selectedCard}
               onDelete={deleteCard}
@@ -197,6 +200,7 @@ export function BoardView({ boardId, onExit }: Props) {
         {editable && selectedConn && (
           <aside className="side-panel">
             <ConnectionInspector
+              key={selectedConn.id}
               boardId={boardId}
               connection={selectedConn}
               onDelete={deleteConnection}

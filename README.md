@@ -1,7 +1,7 @@
 # The Mystery Board
 
 A detective-style **cork board** for TTRPG campaigns. Pin concepts, NPCs and places
-as **Polaroids** with handwritten notes, tie **strings** between them to show
+as **Cards** with handwritten notes, tie **strings** between them to show
 relationships, and **reveal** clues to your players one at a time -- live.
 
 Runs as a standalone web app or inside Discord as an Activity. Anyone with Discord
@@ -10,7 +10,7 @@ can sign in and create their own boards.
 ## How it works
 
 - **Anyone** signs in with Discord and creates boards. The creator is the board's
-  **Game Master** and can add Polaroids, tie strings, and toggle each item between
+  **Game Master** and can add Cards, tie strings, and toggle each item between
   **hidden** and **revealed**.
 - **Players** join via an invite link, sign in with Discord, and see only what's
   been revealed. Hidden cards and strings are **never sent to their browser** -- the
@@ -87,12 +87,12 @@ Discord.
 ## Everyday use
 
 1. Sign in with Discord. You'll see **Your Boards** and a create field.
-2. Create a board, then **+ Polaroid** to drop a card. Select it to set a title,
+2. Create a board, then **+ Card** to drop a card. Select it to set a title,
    handwritten note, paste an image URL, tilt it, and flip **Hidden / Revealed**.
 3. **Tie a string:** click a card's thumbtack, then another card's thumbtack. Select
    the string to label it, colour it, or reveal it.
 4. **Notepad:** a card can carry a lined-yellow **notepad** of tidbits tucked under
-   the Polaroid with its edge peeking out. Click the peek to pull it open; as GM add
+   the Card with its edge peeking out. Click the peek to pull it open; as GM add
    lines and reveal them individually (or hit **Reveal next**). A revealed tidbit
    jumps to the bottom of the revealed block, so players read them in reveal order --
    and un-revealed tidbit text never leaves the server.
@@ -131,7 +131,7 @@ tokens, and tidbit reordering.
 ```
 shared/   Shared TypeScript types (Card, Connection, BoardEvent, ...)
 server/   Hono API -- auth, boards, cards, connections, SSE
-client/   React cork board -- Board, Polaroid, StringLayer, Inspector
+client/   React cork board -- Board, Card, StringLayer, Inspector
 ```
 
 ## Run as a Discord Activity

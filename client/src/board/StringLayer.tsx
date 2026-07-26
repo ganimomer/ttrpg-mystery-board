@@ -8,14 +8,38 @@ interface Props {
   selectedId: string | null;
   pending: { fromCardId: string; toX: number; toY: number } | null;
   onSelect: (id: string) => void;
+  /**
+   * "hit" draws only the invisible click targets and is rendered *below* the
+   * cards, so a string never steals a click from the thumbtack it anchors to.
+   * "art" draws the visible strings and their tags, above the cards.
+   */
+  layer: "hit" | "art";
 }
 
-function sagPath(x1: number, y1: number, x2: number, y2: number): string {
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-  const dist = Math.hypot(x2 - x1, y2 - y1);
-  const sag = Math.min(60, dist * 0.18); // gravity droop
-  return `M ${x1} ${y1} Q ${mx} ${my + sag} ${x2} ${y2}`;
+const MAX_SAG = 60;
+const SAG_RATIO = 0.18;
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+function stringGeometry(a: Point, b: Point) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const sag = Math.min(MAX_SAG, Math.hypot(dx, dy) * SAG_RATIO); // gravity droop
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  // A quadratic's tangent at t=0.5 is parallel to its chord, so the tag can
+  // simply follow the chord's angle — flipped to stay right-side up.
+  let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  if (angle > 90) angle -= 180;
+  else if (angle < -90) angle += 180;
+  return {
+    d: `M ${a.x} ${a.y} Q ${mx} ${my + sag} ${b.x} ${b.y}`,
+    // The curve's own midpoint: B(0.5) = chord midpoint + half the sag.
+    tag: { x: mx, y: my + sag / 2, angle },
+  };
 }
 
 export function StringLayer({
@@ -25,14 +49,15 @@ export function StringLayer({
   selectedId,
   pending,
   onSelect,
+  layer,
 }: Props) {
   // A large, offset canvas so strings never clip and negative board
-  // coordinates are covered. The inner <g> re-centers board-space origin.
+  // coordinates are covered; the viewBox re-centers board-space origin.
   const SPAN = 20000;
   const HALF = SPAN / 2;
   return (
     <svg
-      className="string-layer"
+      className={`string-layer string-layer--${layer}`}
       style={{ left: -HALF, top: -HALF, width: SPAN, height: SPAN }}
       viewBox={`${-HALF} ${-HALF} ${SPAN} ${SPAN}`}
       aria-hidden="true"
@@ -41,16 +66,15 @@ export function StringLayer({
         const from = cards[conn.fromCardId];
         const to = cards[conn.toCardId];
         if (!from || !to) return null;
-        const a = tackAnchor(from.x, from.y);
-        const b = tackAnchor(to.x, to.y);
-        const d = sagPath(a.x, a.y, b.x, b.y);
-        const mx = (a.x + b.x) / 2;
-        const my = (a.y + b.y) / 2 + Math.min(60, Math.hypot(b.x - a.x, b.y - a.y) * 0.18) / 2;
+        const { d, tag } = stringGeometry(
+          tackAnchor(from.x, from.y),
+          tackAnchor(to.x, to.y),
+        );
         const dim = conn.revealed ? "" : "string--hidden";
         return (
           <g key={conn.id} className={selectedId === conn.id ? "string--selected" : ""}>
             {/* Wide invisible hit area for easy selection */}
-            {editable && (
+            {layer === "hit" && editable && (
               <path
                 d={d}
                 className="string-hit"
@@ -60,10 +84,12 @@ export function StringLayer({
                 }}
               />
             )}
-            <path d={d} className={`string ${dim}`} stroke={conn.color} />
-            {conn.label && (
+            {layer === "art" && (
+              <path d={d} className={`string ${dim}`} stroke={conn.color} />
+            )}
+            {layer === "art" && conn.label && (
               <g
-                transform={`translate(${mx}, ${my})`}
+                transform={`translate(${tag.x}, ${tag.y}) rotate(${tag.angle})`}
                 className="string-tag"
                 onPointerDown={
                   editable
@@ -91,15 +117,14 @@ export function StringLayer({
         );
       })}
 
-      {pending && cards[pending.fromCardId] && (
+      {layer === "art" && pending && cards[pending.fromCardId] && (
         <path
-          d={(() => {
-            const a = tackAnchor(
-              cards[pending.fromCardId].x,
-              cards[pending.fromCardId].y,
-            );
-            return sagPath(a.x, a.y, pending.toX, pending.toY);
-          })()}
+          d={
+            stringGeometry(
+              tackAnchor(cards[pending.fromCardId].x, cards[pending.fromCardId].y),
+              { x: pending.toX, y: pending.toY },
+            ).d
+          }
           className="string string--pending"
         />
       )}

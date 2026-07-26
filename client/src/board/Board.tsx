@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import type { Card, Connection } from "@board/shared";
+import type { Card as CardData, Connection } from "@board/shared";
+import { Card } from "./Card";
 import { NotepadOverlay } from "./NotepadOverlay";
-import { Polaroid } from "./Polaroid";
 import { StringLayer } from "./StringLayer";
 import { useViewport } from "./useViewport";
 
@@ -12,7 +12,7 @@ export interface BoardHandles {
 
 interface Props {
   boardId: string;
-  cards: Record<string, Card>;
+  cards: Record<string, CardData>;
   connections: Record<string, Connection>;
   editable: boolean;
   selectedId: string | null;
@@ -102,6 +102,20 @@ export function Board({
     onBackgroundPointerDown(e);
   }
 
+  // Strings are drawn twice: their click targets below the cards (so a string
+  // never covers the tack it hangs from) and their visible selves above.
+  const stringProps = {
+    connections: Object.values(connections),
+    cards,
+    editable,
+    selectedId,
+    pending:
+      pendingFrom && cursor
+        ? { fromCardId: pendingFrom, toX: cursor.x, toY: cursor.y }
+        : null,
+    onSelect: onSelectConnection,
+  };
+
   return (
     <div
       ref={containerRef}
@@ -119,21 +133,10 @@ export function Board({
           transform: `translate(${vp.panX}px, ${vp.panY}px) scale(${vp.zoom})`,
         }}
       >
-        <StringLayer
-          connections={Object.values(connections)}
-          cards={cards}
-          editable={editable}
-          selectedId={selectedId}
-          pending={
-            pendingFrom && cursor
-              ? { fromCardId: pendingFrom, toX: cursor.x, toY: cursor.y }
-              : null
-          }
-          onSelect={onSelectConnection}
-        />
+        <StringLayer {...stringProps} layer="hit" />
 
         {Object.values(cards).map((card) => (
-          <Polaroid
+          <Card
             key={card.id}
             card={card}
             editable={editable}
@@ -147,6 +150,8 @@ export function Board({
             onOpenNotepad={onOpenNotepad}
           />
         ))}
+
+        <StringLayer {...stringProps} layer="art" />
       </div>
 
       {pendingFrom && (

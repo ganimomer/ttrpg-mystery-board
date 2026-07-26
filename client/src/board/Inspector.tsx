@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import type { Card, Connection } from "@board/shared";
 import { api } from "../api";
+import { useCommittedField } from "./useCommittedField";
 
 const STRING_COLORS = ["#c0392b", "#2c3e50", "#27ae60", "#8e44ad", "#d35400", "#16a085"];
 
@@ -12,24 +12,21 @@ interface CardInspectorProps {
 }
 
 export function CardInspector({ boardId, card, onDelete, onOpenNotepad }: CardInspectorProps) {
-  const [title, setTitle] = useState(card.title);
-  const [note, setNote] = useState(card.note);
-  const [imageUrl, setImageUrl] = useState(card.imageUrl ?? "");
-
-  // Reseed when a different card is selected.
-  useEffect(() => {
-    setTitle(card.title);
-    setNote(card.note);
-    setImageUrl(card.imageUrl ?? "");
-  }, [card.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const save = (patch: Parameters<typeof api.updateCard>[2]) =>
     void api.updateCard(boardId, card.id, patch).catch(() => {});
+
+  // BoardView keys this panel by card id, so switching cards unmounts it and
+  // each field commits whatever was typed. See useCommittedField.
+  const title = useCommittedField(card.title, (value) => save({ title: value }));
+  const note = useCommittedField(card.note, (value) => save({ note: value }));
+  const imageUrl = useCommittedField(card.imageUrl ?? "", (value) =>
+    save({ imageUrl: value.trim() || null }),
+  );
 
   return (
     <div className="inspector">
       <div className="inspector-head">
-        <h3>Polaroid</h3>
+        <h3>Card</h3>
         <RevealToggle
           revealed={card.revealed}
           onChange={(revealed) => save({ revealed })}
@@ -38,39 +35,23 @@ export function CardInspector({ boardId, card, onDelete, onOpenNotepad }: CardIn
 
       <label className="field">
         <span>Title</span>
-        <input
-          value={title}
-          maxLength={200}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => title !== card.title && save({ title })}
-          placeholder="e.g. Mayor Aldric"
-        />
+        <input {...title} maxLength={200} placeholder="e.g. Mayor Aldric" />
       </label>
 
       <label className="field">
         <span>Handwritten note</span>
         <textarea
+          {...note}
           className="note-input"
-          value={note}
           maxLength={2000}
           rows={4}
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={() => note !== card.note && save({ note })}
           placeholder="Scribble what the players know…"
         />
       </label>
 
       <label className="field">
         <span>Image URL</span>
-        <input
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          onBlur={() => {
-            const trimmed = imageUrl.trim() || null;
-            if (trimmed !== (card.imageUrl ?? null)) save({ imageUrl: trimmed });
-          }}
-          placeholder="https://cdn.discordapp.com/…"
-        />
+        <input {...imageUrl} placeholder="https://cdn.discordapp.com/…" />
       </label>
       {card.imageUrl && (
         <img
@@ -125,11 +106,10 @@ export function ConnectionInspector({
   connection,
   onDelete,
 }: ConnInspectorProps) {
-  const [label, setLabel] = useState(connection.label);
-  useEffect(() => setLabel(connection.label), [connection.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const save = (patch: Parameters<typeof api.updateConnection>[2]) =>
     void api.updateConnection(boardId, connection.id, patch).catch(() => {});
+
+  const label = useCommittedField(connection.label, (value) => save({ label: value }));
 
   return (
     <div className="inspector">
@@ -143,13 +123,7 @@ export function ConnectionInspector({
 
       <label className="field">
         <span>Note on the string</span>
-        <input
-          value={label}
-          maxLength={200}
-          onChange={(e) => setLabel(e.target.value)}
-          onBlur={() => label !== connection.label && save({ label })}
-          placeholder="e.g. blackmailed by"
-        />
+        <input {...label} maxLength={200} placeholder="e.g. blackmailed by" />
       </label>
 
       <div className="field">

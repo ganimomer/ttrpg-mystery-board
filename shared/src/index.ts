@@ -27,7 +27,7 @@ export interface Tidbit {
   revealed: boolean;
 }
 
-/** A Polaroid card pinned to the board. */
+/** A card pinned to the board. */
 export interface Card {
   id: string;
   boardId: string;
@@ -38,7 +38,7 @@ export interface Card {
   y: number;
   rotation: number; // degrees
   revealed: boolean;
-  // Lined-notepaper tidbits tucked under the Polaroid. Ordered; the server
+  // Lined-notepaper tidbits tucked under the card. Ordered; the server
   // returns this already role-filtered (players get only revealed tidbits).
   notepad: Tidbit[];
 }

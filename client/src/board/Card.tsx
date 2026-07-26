@@ -1,10 +1,10 @@
 import { useRef } from "react";
-import type { Card } from "@board/shared";
+import type { Card as CardData } from "@board/shared";
 import { CARD_HEIGHT, CARD_WIDTH } from "./layout";
 import { Thumbtack } from "./Thumbtack";
 
 interface Props {
-  card: Card;
+  card: CardData;
   editable: boolean;
   selected: boolean;
   connectArmed: boolean; // in connect mode, this card is a candidate target
@@ -16,7 +16,7 @@ interface Props {
   onOpenNotepad: (id: string) => void;
 }
 
-export function Polaroid({
+export function Card({
   card,
   editable,
   selected,
@@ -77,7 +77,7 @@ export function Polaroid({
   return (
     <div
       className={[
-        "polaroid",
+        "card",
         selected ? "is-selected" : "",
         connectArmed ? "is-connect-target" : "",
         card.revealed ? "" : "is-hidden",
@@ -114,7 +114,7 @@ export function Polaroid({
         </button>
       )}
 
-      <div className="polaroid-inner">
+      <div className="card-inner">
         <button
           type="button"
           className="tack-hit"
@@ -128,7 +128,7 @@ export function Polaroid({
           <Thumbtack color={card.revealed ? "#d63031" : "#8d6e63"} />
         </button>
 
-        <div className="polaroid-photo">
+        <div className="card-photo">
           {card.imageUrl ? (
             <img
               src={card.imageUrl}
@@ -139,14 +139,14 @@ export function Polaroid({
               }}
             />
           ) : (
-            <div className="polaroid-photo-empty">no photo</div>
+            <div className="card-photo-empty">no photo</div>
           )}
         </div>
-        <div className="polaroid-caption">
-          {card.title && <div className="polaroid-title">{card.title}</div>}
-          {card.note && <div className="polaroid-note">{card.note}</div>}
+        <div className="card-caption">
+          {card.title && <div className="card-title">{card.title}</div>}
+          {card.note && <div className="card-note">{card.note}</div>}
           {!card.title && !card.note && (
-            <div className="polaroid-note polaroid-note--muted">…</div>
+            <div className="card-note card-note--muted">…</div>
           )}
         </div>
       </div>
