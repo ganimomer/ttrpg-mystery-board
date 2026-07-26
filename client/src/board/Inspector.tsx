@@ -8,9 +8,10 @@ interface CardInspectorProps {
   boardId: string;
   card: Card;
   onDelete: (id: string) => void;
+  onOpenNotepad: (id: string) => void;
 }
 
-export function CardInspector({ boardId, card, onDelete }: CardInspectorProps) {
+export function CardInspector({ boardId, card, onDelete, onOpenNotepad }: CardInspectorProps) {
   const [title, setTitle] = useState(card.title);
   const [note, setNote] = useState(card.note);
   const [imageUrl, setImageUrl] = useState(card.imageUrl ?? "");
@@ -79,6 +80,17 @@ export function CardInspector({ boardId, card, onDelete }: CardInspectorProps) {
           onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
         />
       )}
+
+      <div className="field">
+        <span>Notepad</span>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => onOpenNotepad(card.id)}
+        >
+          Open notepad{card.notepad.length > 0 ? ` (${card.notepad.length})` : ""}
+        </button>
+      </div>
 
       <label className="field">
         <span>Tilt ({card.rotation}°)</span>

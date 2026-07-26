@@ -21,6 +21,9 @@ interface Props {
   onClearSelection: () => void;
   onMoveCard: (id: string, x: number, y: number, commit: boolean) => void;
   onCreateConnection: (fromCardId: string, toCardId: string) => void;
+  openNotepadCardId: string | null;
+  onOpenNotepad: (id: string) => void;
+  onCloseNotepad: () => void;
   handlesRef?: React.MutableRefObject<BoardHandles | null>;
 }
 
@@ -35,6 +38,9 @@ export function Board({
   onClearSelection,
   onMoveCard,
   onCreateConnection,
+  openNotepadCardId,
+  onOpenNotepad,
+  onCloseNotepad,
   handlesRef,
 }: Props) {
   const {
@@ -49,7 +55,6 @@ export function Board({
   const containerRef = useRef<HTMLDivElement>(null);
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
-  const [openNotepadCardId, setOpenNotepadCardId] = useState<string | null>(null);
 
   if (handlesRef) {
     handlesRef.current = {
@@ -139,7 +144,7 @@ export function Board({
             onDragMove={(id, x, y) => onMoveCard(id, x, y, false)}
             onDragEnd={(id, x, y) => onMoveCard(id, x, y, true)}
             onTackClick={handleTackClick}
-            onOpenNotepad={setOpenNotepadCardId}
+            onOpenNotepad={onOpenNotepad}
           />
         ))}
       </div>
@@ -153,7 +158,7 @@ export function Board({
           boardId={boardId}
           card={cards[openNotepadCardId]}
           editable={editable}
-          onClose={() => setOpenNotepadCardId(null)}
+          onClose={onCloseNotepad}
         />
       )}
     </div>

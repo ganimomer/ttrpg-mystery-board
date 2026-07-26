@@ -22,6 +22,7 @@ export function BoardView({ boardId, onExit }: Props) {
   const [previewAsPlayer, setPreviewAsPlayer] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [openNotepadCardId, setOpenNotepadCardId] = useState<string | null>(null);
   const handles = useRef<BoardHandles | null>(null);
 
   const isGM = state.board?.role === "gm";
@@ -177,6 +178,9 @@ export function BoardView({ boardId, onExit }: Props) {
           onClearSelection={() => setSelection(null)}
           onMoveCard={moveCard}
           onCreateConnection={createConnection}
+          openNotepadCardId={openNotepadCardId}
+          onOpenNotepad={setOpenNotepadCardId}
+          onCloseNotepad={() => setOpenNotepadCardId(null)}
           handlesRef={handles}
         />
 
@@ -186,6 +190,7 @@ export function BoardView({ boardId, onExit }: Props) {
               boardId={boardId}
               card={selectedCard}
               onDelete={deleteCard}
+              onOpenNotepad={setOpenNotepadCardId}
             />
           </aside>
         )}

@@ -97,7 +97,7 @@ export function Polaroid({
       onPointerUp={onPointerUp}
     >
       {/* Lined yellow notepaper tucked behind the card, edge peeking below. */}
-      {hasNotepad && (
+      {(hasNotepad || editable) && (
         <button
           type="button"
           className="notepad-peek"
@@ -108,7 +108,9 @@ export function Polaroid({
             onOpenNotepad(card.id);
           }}
         >
-          <span className="notepad-peek-count">{card.notepad.length}</span>
+          <span className="notepad-peek-count">
+            {hasNotepad ? card.notepad.length : "+"}
+          </span>
         </button>
       )}
 
