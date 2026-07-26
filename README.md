@@ -122,9 +122,41 @@ server/   Hono API — auth, boards, cards, connections, images, SSE
 client/   React cork board — Board, Polaroid, StringLayer, Inspector
 ```
 
-## Roadmap → Discord Activity
+## Run as a Discord Activity
 
-The app is already shaped for it: relative `/api` paths, no external CDN assets, and
-auth behind a small provider. The later phase adds the `@discord/embedded-app-sdk`,
-Discord URL mappings, and swaps the OAuth redirect for the SDK's in-iframe
-authorization — reusing the same server-side token exchange.
+The same app also runs **inside Discord** as an Activity (embedded in a voice
+channel). It's dual-mode: in a normal browser it uses the Discord-login + invite
+flow above; inside Discord it uses the Embedded App SDK. Detection is automatic
+(Discord adds a `frame_id` to the iframe URL).
+
+**How auth works inside Discord:** the [Embedded App SDK](https://github.com/discord/embedded-app-sdk)
+runs the OAuth2 `authorize` flow, the client sends the resulting `code` to
+`POST /api/auth/discord/token`, the server exchanges it (holding the client secret)
+and returns a signed session token. Because cookies are unreliable in a cross-site
+iframe, that token is sent as a `Bearer` header (and as `?token=` for `<img>` and the
+SSE stream, which can't set headers).
+
+### One-time Discord setup
+
+1. In the [Developer Portal](https://discord.com/developers/applications) open your
+   app → **Activities** → enable it.
+2. **Activities → URL Mappings**: add a **root mapping** `/` → your app's public
+   HTTPS origin. Because our server serves both the client and `/api` from one
+   origin, this single mapping proxies everything (no `.proxy` prefix needed).
+3. Set `VITE_DISCORD_CLIENT_ID` in `.env` (same value as `DISCORD_CLIENT_ID`).
+
+### Local development
+
+The activity iframe must reach your dev server over HTTPS, so tunnel it:
+
+```bash
+npm run dev                 # client :5173 (proxies /api → server :8787)
+npx cloudflared tunnel --url http://localhost:5173   # in another terminal
+```
+
+Point the portal's root URL mapping at the printed `https://…trycloudflare.com`
+URL, then launch the Activity from a voice channel (the “rocket” / Activities menu).
+The dev server already allows tunneled hosts and runs HMR over 443.
+
+> Only the `identify` scope is required. `identify`-based board access is still via
+> invite links; mapping Discord voice-channel membership to boards is future work.
