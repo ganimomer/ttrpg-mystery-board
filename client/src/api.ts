@@ -7,7 +7,6 @@ import type {
   CreateCardInput,
   CreateConnectionInput,
   CreateTidbitInput,
-  ImageMeta,
   Invite,
   Me,
   UpdateCardInput,
@@ -131,17 +130,8 @@ export const api = {
       method: "DELETE",
     }),
 
-  uploadImage: async (boardId: string, file: File): Promise<ImageMeta> => {
-    const form = new FormData();
-    form.append("file", file);
-    return req<ImageMeta>(`/boards/${boardId}/images`, {
-      method: "POST",
-      body: form,
-    });
-  },
-  // These are used as an <img> src and an EventSource URL, which can't set an
-  // Authorization header, so the token (when present) rides as a query param.
-  imageUrl: (imageId: string) => withToken(`/api/images/${imageId}`),
+  // EventSource URLs can't set an Authorization header, so the token rides as
+  // a query param.
   eventsUrl: (boardId: string) => withToken(`/api/boards/${boardId}/events`),
 };
 

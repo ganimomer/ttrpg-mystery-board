@@ -8,7 +8,7 @@ function card(id: string, revealed: boolean): Card {
     boardId: "b",
     title: id,
     note: "",
-    imageId: null,
+    imageUrl: null,
     x: 0,
     y: 0,
     rotation: 0,

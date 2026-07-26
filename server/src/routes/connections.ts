@@ -4,8 +4,8 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { requireBoardGM, requireBoardMember } from "../access.js";
 import { requireAuth } from "../auth/session.js";
+import { loadConnection } from "../cards.js";
 import { db, schema } from "../db/index.js";
-import { toConnection } from "../mappers.js";
 import {
   publishConnectionRemove,
   publishConnectionUpsert,
@@ -31,12 +31,13 @@ const updateSchema = z.object({
   revealed: z.boolean().optional(),
 });
 
-function cardOnBoard(cardId: string, boardId: string): boolean {
-  return !!db
+async function cardOnBoard(cardId: string, boardId: string): Promise<boolean> {
+  const [row] = await db
     .select({ id: schema.cards.id })
     .from(schema.cards)
     .where(and(eq(schema.cards.id, cardId), eq(schema.cards.boardId, boardId)))
-    .get();
+    .limit(1);
+  return !!row;
 }
 
 connectionsRoutes.post("/", requireBoardGM, async (c) => {
@@ -48,78 +49,33 @@ connectionsRoutes.post("/", requireBoardGM, async (c) => {
   if (d.fromCardId === d.toCardId) {
     return c.json({ error: "A string needs two different cards" }, 400);
   }
-  if (!cardOnBoard(d.fromCardId, boardId) || !cardOnBoard(d.toCardId, boardId)) {
+  if (
+    !(await cardOnBoard(d.fromCardId, boardId)) ||
+    !(await cardOnBoard(d.toCardId, boardId))
+  ) {
     return c.json({ error: "Both cards must be on this board" }, 400);
   }
 
   const id = nanoid();
-  db.insert(schema.connections)
-    .values({
-      id,
-      boardId,
-      fromCardId: d.fromCardId,
-      toCardId: d.toCardId,
-      label: d.label ?? "",
-      color: d.color ?? "#c0392b",
-      revealed: d.revealed ?? false,
-    })
-    .run();
+  await db.insert(schema.connections).values({
+    id,
+    boardId,
+    fromCardId: d.fromCardId,
+    toCardId: d.toCardId,
+    label: d.label ?? "",
+    color: d.color ?? "#c0392b",
+    revealed: d.revealed ?? false,
+  });
 
-  const conn = toConnection(
-    db
-      .select()
-      .from(schema.connections)
-      .where(eq(schema.connections.id, id))
-      .get()!,
-  );
-  publishConnectionUpsert(conn);
+  const conn = (await loadConnection(id))!;
+  await publishConnectionUpsert(conn);
   return c.json(conn, 201);
 });
 
 connectionsRoutes.patch("/:connectionId", requireBoardGM, async (c) => {
   const boardId = c.get("boardId");
   const connectionId = c.req.param("connectionId");
-  const existing = db
-    .select()
-    .from(schema.connections)
-    .where(
-      and(
-        eq(schema.connections.id, connectionId),
-        eq(schema.connections.boardId, boardId),
-      ),
-    )
-    .get();
-  if (!existing) return c.json({ error: "Connection not found" }, 404);
-
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = updateSchema.safeParse(body);
-  if (!parsed.success) return c.json({ error: "Invalid update" }, 400);
-  const d = parsed.data;
-
-  db.update(schema.connections)
-    .set({
-      ...(d.label !== undefined && { label: d.label }),
-      ...(d.color !== undefined && { color: d.color }),
-      ...(d.revealed !== undefined && { revealed: d.revealed }),
-    })
-    .where(eq(schema.connections.id, connectionId))
-    .run();
-
-  const conn = toConnection(
-    db
-      .select()
-      .from(schema.connections)
-      .where(eq(schema.connections.id, connectionId))
-      .get()!,
-  );
-  publishConnectionUpsert(conn);
-  return c.json(conn);
-});
-
-connectionsRoutes.delete("/:connectionId", requireBoardGM, (c) => {
-  const boardId = c.get("boardId");
-  const connectionId = c.req.param("connectionId");
-  const existing = db
+  const [existing] = await db
     .select({ id: schema.connections.id })
     .from(schema.connections)
     .where(
@@ -128,11 +84,45 @@ connectionsRoutes.delete("/:connectionId", requireBoardGM, (c) => {
         eq(schema.connections.boardId, boardId),
       ),
     )
-    .get();
+    .limit(1);
   if (!existing) return c.json({ error: "Connection not found" }, 404);
-  db.delete(schema.connections)
-    .where(eq(schema.connections.id, connectionId))
-    .run();
-  publishConnectionRemove(boardId, connectionId);
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: "Invalid update" }, 400);
+  const d = parsed.data;
+
+  await db
+    .update(schema.connections)
+    .set({
+      ...(d.label !== undefined && { label: d.label }),
+      ...(d.color !== undefined && { color: d.color }),
+      ...(d.revealed !== undefined && { revealed: d.revealed }),
+    })
+    .where(eq(schema.connections.id, connectionId));
+
+  const conn = (await loadConnection(connectionId))!;
+  await publishConnectionUpsert(conn);
+  return c.json(conn);
+});
+
+connectionsRoutes.delete("/:connectionId", requireBoardGM, async (c) => {
+  const boardId = c.get("boardId");
+  const connectionId = c.req.param("connectionId");
+  const [existing] = await db
+    .select({ id: schema.connections.id })
+    .from(schema.connections)
+    .where(
+      and(
+        eq(schema.connections.id, connectionId),
+        eq(schema.connections.boardId, boardId),
+      ),
+    )
+    .limit(1);
+  if (!existing) return c.json({ error: "Connection not found" }, 404);
+  await db
+    .delete(schema.connections)
+    .where(eq(schema.connections.id, connectionId));
+  await publishConnectionRemove(boardId, connectionId);
   return c.json({ ok: true });
 });

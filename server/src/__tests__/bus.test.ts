@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { BoardEvent, Card, Connection } from "@board/shared";
 import {
-  publishCardRemove,
-  publishCardUpsert,
-  publishConnectionUpsert,
+  deliverCardRemove,
+  deliverCardUpsert,
+  deliverConnectionUpsert,
   subscribe,
-} from "../realtime/bus.js";
+} from "../realtime/subscribers.js";
 
 function collector() {
   const events: BoardEvent[] = [];
@@ -18,7 +18,7 @@ function card(revealed: boolean): Card {
     boardId: "board1",
     title: "Secret",
     note: "",
-    imageId: null,
+    imageUrl: null,
     x: 0,
     y: 0,
     rotation: 0,
@@ -27,14 +27,14 @@ function card(revealed: boolean): Card {
   };
 }
 
-describe("realtime bus reveal filtering", () => {
+describe("realtime subscriber reveal filtering", () => {
   it("sends hidden card upserts to the GM but a removal to players", () => {
     const gm = collector();
     const player = collector();
     const offGm = subscribe("board1", { role: "gm", send: gm.send });
     const offPlayer = subscribe("board1", { role: "player", send: player.send });
 
-    publishCardUpsert(card(false));
+    deliverCardUpsert(card(false));
 
     expect(gm.events).toEqual([{ type: "card.upserted", card: card(false) }]);
     expect(player.events).toEqual([{ type: "card.removed", cardId: "card1" }]);
@@ -49,7 +49,7 @@ describe("realtime bus reveal filtering", () => {
     const offGm = subscribe("board1", { role: "gm", send: gm.send });
     const offPlayer = subscribe("board1", { role: "player", send: player.send });
 
-    publishCardUpsert(card(true));
+    deliverCardUpsert(card(true));
 
     expect(gm.events[0]).toEqual({ type: "card.upserted", card: card(true) });
     expect(player.events[0]).toEqual({ type: "card.upserted", card: card(true) });
@@ -71,7 +71,7 @@ describe("realtime bus reveal filtering", () => {
       revealed: false,
     };
 
-    publishConnectionUpsert(hidden);
+    deliverConnectionUpsert(hidden);
 
     expect(player.events).toEqual([
       { type: "connection.removed", connectionId: "c1" },
@@ -87,7 +87,7 @@ describe("realtime bus reveal filtering", () => {
     const offGm = subscribe("board1", { role: "gm", send: gm.send });
     const offPlayer = subscribe("board1", { role: "player", send: player.send });
 
-    publishCardRemove("board1", "card1");
+    deliverCardRemove("board1", "card1");
 
     expect(gm.events).toContainEqual({ type: "card.removed", cardId: "card1" });
     expect(player.events).toContainEqual({
@@ -111,7 +111,7 @@ describe("realtime bus reveal filtering", () => {
         { id: "t2", text: "hidden secret", revealed: false },
       ],
     };
-    publishCardUpsert(revealedCard);
+    deliverCardUpsert(revealedCard);
 
     const gmEvent = gm.events[0];
     const playerEvent = player.events[0];

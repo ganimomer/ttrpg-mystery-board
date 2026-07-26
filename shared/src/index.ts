@@ -8,10 +8,9 @@ export interface User {
   avatar: string | null; // Discord avatar hash
 }
 
-/** The current session's view of who they are on a given board. */
+/** The current session's identity. Any signed-in user may create boards. */
 export interface Me {
   user: User;
-  isGameMaster: boolean; // present in the GM allowlist (may create boards / upload)
 }
 
 export interface Board {
@@ -34,7 +33,7 @@ export interface Card {
   boardId: string;
   title: string;
   note: string; // handwritten caption
-  imageId: string | null;
+  imageUrl: string | null; // hotlinked image URL (we never host the bytes)
   x: number;
   y: number;
   rotation: number; // degrees
@@ -71,7 +70,7 @@ export interface CreateBoardInput {
 export interface CreateCardInput {
   title?: string;
   note?: string;
-  imageId?: string | null;
+  imageUrl?: string | null;
   x: number;
   y: number;
   rotation?: number;
@@ -79,7 +78,7 @@ export interface CreateCardInput {
 }
 
 export type UpdateCardInput = Partial<
-  Pick<Card, "title" | "note" | "imageId" | "x" | "y" | "rotation" | "revealed">
+  Pick<Card, "title" | "note" | "imageUrl" | "x" | "y" | "rotation" | "revealed">
 >;
 
 export interface CreateConnectionInput {
@@ -99,14 +98,6 @@ export interface CreateTidbitInput {
 }
 
 export type UpdateTidbitInput = Partial<Pick<Tidbit, "text" | "revealed">>;
-
-export interface ImageMeta {
-  id: string;
-  boardId: string;
-  width: number;
-  height: number;
-  mime: string;
-}
 
 export interface Invite {
   token: string;

@@ -1,33 +1,33 @@
-import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   integer,
+  pgTable,
   primaryKey,
-  sqliteTable,
   text,
-} from "drizzle-orm/sqlite-core";
+  timestamp,
+} from "drizzle-orm/pg-core";
 
-export const users = sqliteTable("users", {
+const createdAt = () =>
+  timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
+
+export const users = pgTable("users", {
   id: text("id").primaryKey(), // Discord user id
   username: text("username").notNull(),
   avatar: text("avatar"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+  createdAt: createdAt(),
 });
 
-export const boards = sqliteTable("boards", {
+export const boards = pgTable("boards", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+  createdAt: createdAt(),
 });
 
-export const boardMembers = sqliteTable(
+export const boardMembers = pgTable(
   "board_members",
   {
     boardId: text("board_id")
@@ -37,14 +37,12 @@ export const boardMembers = sqliteTable(
       .notNull()
       .references(() => users.id),
     role: text("role", { enum: ["gm", "player"] }).notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.boardId, t.userId] })],
 );
 
-export const invites = sqliteTable("invites", {
+export const invites = pgTable("invites", {
   token: text("token").primaryKey(),
   boardId: text("board_id")
     .notNull()
@@ -52,30 +50,11 @@ export const invites = sqliteTable("invites", {
   createdBy: text("created_by")
     .notNull()
     .references(() => users.id),
-  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
 });
 
-export const images = sqliteTable("images", {
-  id: text("id").primaryKey(),
-  boardId: text("board_id")
-    .notNull()
-    .references(() => boards.id, { onDelete: "cascade" }),
-  filename: text("filename").notNull(), // on-disk filename
-  mime: text("mime").notNull(),
-  width: integer("width").notNull(),
-  height: integer("height").notNull(),
-  uploadedBy: text("uploaded_by")
-    .notNull()
-    .references(() => users.id),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-});
-
-export const cards = sqliteTable(
+export const cards = pgTable(
   "cards",
   {
     id: text("id").primaryKey(),
@@ -84,19 +63,17 @@ export const cards = sqliteTable(
       .references(() => boards.id, { onDelete: "cascade" }),
     title: text("title").notNull().default(""),
     note: text("note").notNull().default(""),
-    imageId: text("image_id").references(() => images.id),
+    imageUrl: text("image_url"),
     x: integer("x").notNull().default(0),
     y: integer("y").notNull().default(0),
     rotation: integer("rotation").notNull().default(0),
-    revealed: integer("revealed", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    revealed: boolean("revealed").notNull().default(false),
+    createdAt: createdAt(),
   },
   (t) => [index("cards_board_idx").on(t.boardId)],
 );
 
-export const connections = sqliteTable(
+export const connections = pgTable(
   "connections",
   {
     id: text("id").primaryKey(),
@@ -111,15 +88,13 @@ export const connections = sqliteTable(
       .references(() => cards.id, { onDelete: "cascade" }),
     label: text("label").notNull().default(""),
     color: text("color").notNull().default("#c0392b"),
-    revealed: integer("revealed", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    revealed: boolean("revealed").notNull().default(false),
+    createdAt: createdAt(),
   },
   (t) => [index("connections_board_idx").on(t.boardId)],
 );
 
-export const noteItems = sqliteTable(
+export const noteItems = pgTable(
   "note_items",
   {
     id: text("id").primaryKey(),
@@ -130,11 +105,9 @@ export const noteItems = sqliteTable(
       .notNull()
       .references(() => boards.id, { onDelete: "cascade" }),
     text: text("text").notNull().default(""),
-    revealed: integer("revealed", { mode: "boolean" }).notNull().default(false),
+    revealed: boolean("revealed").notNull().default(false),
     position: integer("position").notNull().default(0),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    createdAt: createdAt(),
   },
   (t) => [index("note_items_card_idx").on(t.cardId)],
 );

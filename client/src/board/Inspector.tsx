@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Card, Connection } from "@board/shared";
 import { api } from "../api";
 
@@ -13,32 +13,17 @@ interface CardInspectorProps {
 export function CardInspector({ boardId, card, onDelete }: CardInspectorProps) {
   const [title, setTitle] = useState(card.title);
   const [note, setNote] = useState(card.note);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [imageUrl, setImageUrl] = useState(card.imageUrl ?? "");
 
   // Reseed when a different card is selected.
   useEffect(() => {
     setTitle(card.title);
     setNote(card.note);
+    setImageUrl(card.imageUrl ?? "");
   }, [card.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = (patch: Parameters<typeof api.updateCard>[2]) =>
     void api.updateCard(boardId, card.id, patch).catch(() => {});
-
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const img = await api.uploadImage(boardId, file);
-      await api.updateCard(boardId, card.id, { imageId: img.id });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
 
   return (
     <div className="inspector">
@@ -74,38 +59,26 @@ export function CardInspector({ boardId, card, onDelete }: CardInspectorProps) {
         />
       </label>
 
-      <div className="field">
-        <span>Photo</span>
-        <div className="photo-row">
-          {card.imageId && (
-            <img className="photo-thumb" src={api.imageUrl(card.imageId)} alt="" />
-          )}
-          <button
-            type="button"
-            className="btn"
-            disabled={uploading}
-            onClick={() => fileRef.current?.click()}
-          >
-            {uploading ? "Uploading…" : card.imageId ? "Replace" : "Upload photo"}
-          </button>
-          {card.imageId && (
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => save({ imageId: null })}
-            >
-              Remove
-            </button>
-          )}
-        </div>
+      <label className="field">
+        <span>Image URL</span>
         <input
-          ref={fileRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          hidden
-          onChange={onFile}
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          onBlur={() => {
+            const trimmed = imageUrl.trim() || null;
+            if (trimmed !== (card.imageUrl ?? null)) save({ imageUrl: trimmed });
+          }}
+          placeholder="https://cdn.discordapp.com/…"
         />
-      </div>
+      </label>
+      {card.imageUrl && (
+        <img
+          className="photo-thumb"
+          src={card.imageUrl}
+          alt=""
+          onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+        />
+      )}
 
       <label className="field">
         <span>Tilt ({card.rotation}°)</span>

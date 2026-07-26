@@ -45,33 +45,26 @@ export function BoardList({ me, onOpen, onLogout }: Props) {
       <header className="topbar">
         <h1 className="board-name">Your Boards</h1>
         <div className="spacer" />
-        <span className="whoami">
-          {me.user.username}
-          {me.isGameMaster && <span className="gm-badge">GM</span>}
-        </span>
+        <span className="whoami">{me.user.username}</span>
         <button className="btn btn--ghost" onClick={onLogout}>Sign out</button>
       </header>
 
       <div className="board-list-body">
-        {me.isGameMaster && (
-          <form className="create-board" onSubmit={create}>
-            <input
-              placeholder="Name a new board — e.g. “The Ashfall Conspiracy”"
-              value={name}
-              maxLength={120}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <button className="btn" disabled={creating}>Create board</button>
-          </form>
-        )}
+        <form className="create-board" onSubmit={create}>
+          <input
+            placeholder="Name a new board"
+            value={name}
+            maxLength={120}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <button className="btn" disabled={creating}>Create board</button>
+        </form>
 
         {error && <p className="error-text">{error}</p>}
-        {boards === null && <p className="muted">Loading…</p>}
+        {boards === null && <p className="muted">Loading...</p>}
         {boards && boards.length === 0 && (
           <p className="muted">
-            {me.isGameMaster
-              ? "No boards yet — create one above to start pinning."
-              : "No boards yet. Ask your Game Master for an invite link."}
+            No boards yet — create one above to start pinning.
           </p>
         )}
 
