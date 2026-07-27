@@ -1,6 +1,11 @@
 import { useMemo, useRef, useState } from "react";
+import styled from "styled-components";
 import type { Card, Connection } from "@board/shared";
 import { api } from "../api";
+import { StyledButton } from "../ui/Button";
+import { StyledCenterMessage } from "../ui/CenterMessage";
+import { StyledInput } from "../ui/Field";
+import { StyledBoardName, StyledSpacer, StyledTopBar } from "../ui/TopBar";
 import { Board, type BoardHandles } from "./Board";
 import { CardFocus } from "./CardFocus";
 import { ConnectionInspector } from "./Inspector";
@@ -189,13 +194,14 @@ export function BoardView({ boardId, onExit }: Props) {
     }
   }
 
-  if (state.loading) return <div className="center-msg">Unrolling the board…</div>;
+  if (state.loading)
+    return <StyledCenterMessage>Unrolling the board…</StyledCenterMessage>;
   if (state.error) {
     return (
-      <div className="center-msg">
+      <StyledCenterMessage>
         <p>{state.error}</p>
-        <button className="btn" onClick={onExit}>Back</button>
-      </div>
+        <StyledButton onClick={onExit}>Back</StyledButton>
+      </StyledCenterMessage>
     );
   }
 
@@ -217,30 +223,30 @@ export function BoardView({ boardId, onExit }: Props) {
     : [];
 
   return (
-    <div className="boardview">
-      <header className="topbar">
-        <button className="btn btn--ghost" onClick={onExit}>← Boards</button>
-        <h1 className="board-name">{state.board?.name}</h1>
-        <div className="spacer" />
+    <StyledBoardView>
+      <StyledTopBar>
+        <StyledButton $variant="ghost" onClick={onExit}>
+          ← Boards
+        </StyledButton>
+        <StyledBoardName>{state.board?.name}</StyledBoardName>
+        <StyledSpacer />
         {isGM && (
           <>
-            <button
-              className="btn"
+            <StyledButton
               onClick={() => void addCard()}
               disabled={busy || previewAsPlayer}
             >
               + Card
-            </button>
-            <button
-              className="btn"
+            </StyledButton>
+            <StyledButton
               onClick={() => void addCard(FRAME_DEFAULT)}
               disabled={busy || previewAsPlayer}
               title="A dotted frame with a card at its top; drag cards inside to group them"
             >
               + Group
-            </button>
-            <button className="btn" onClick={makeInvite}>Invite players</button>
-            <label className="preview-switch">
+            </StyledButton>
+            <StyledButton onClick={makeInvite}>Invite players</StyledButton>
+            <StyledPreviewSwitch>
               <input
                 type="checkbox"
                 checked={previewAsPlayer}
@@ -251,26 +257,29 @@ export function BoardView({ boardId, onExit }: Props) {
                 }}
               />
               Preview as player
-            </label>
+            </StyledPreviewSwitch>
           </>
         )}
-      </header>
+      </StyledTopBar>
 
       {inviteUrl && (
-        <div className="invite-banner">
+        <StyledInviteBanner>
           <span>Share this link with a player (valid 14 days):</span>
-          <input readOnly value={inviteUrl} onFocus={(e) => e.currentTarget.select()} />
-          <button
-            className="btn"
-            onClick={() => void navigator.clipboard?.writeText(inviteUrl)}
-          >
+          <StyledInviteInput
+            readOnly
+            value={inviteUrl}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <StyledButton onClick={() => void navigator.clipboard?.writeText(inviteUrl)}>
             Copy
-          </button>
-          <button className="btn btn--ghost" onClick={() => setInviteUrl(null)}>×</button>
-        </div>
+          </StyledButton>
+          <StyledButton $variant="ghost" onClick={() => setInviteUrl(null)}>
+            ×
+          </StyledButton>
+        </StyledInviteBanner>
       )}
 
-      <div className="board-stage">
+      <StyledBoardStage>
         <Board
           cards={cards}
           connections={connections}
@@ -312,16 +321,68 @@ export function BoardView({ boardId, onExit }: Props) {
         )}
 
         {editable && selectedConn && (
-          <aside className="side-panel">
+          <StyledSidePanel>
             <ConnectionInspector
               key={selectedConn.id}
               boardId={boardId}
               connection={selectedConn}
               onDelete={deleteConnection}
             />
-          </aside>
+          </StyledSidePanel>
         )}
-      </div>
-    </div>
+      </StyledBoardStage>
+    </StyledBoardView>
   );
 }
+
+/* ─── styles ───────────────────────────────────────────────────── */
+
+const StyledBoardView = styled.div`
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+`;
+
+/* A checkbox is not a field: it keeps its own intrinsic size rather than
+   stretching the way the shared text input does. */
+const StyledPreviewSwitch = styled.label`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #f3e9d7;
+`;
+
+const StyledInviteBanner = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #f6e5c9;
+  color: var(--ink);
+  font-size: 14px;
+`;
+
+const StyledInviteInput = styled(StyledInput)`
+  flex: 1;
+  max-width: 480px;
+`;
+
+const StyledBoardStage = styled.div`
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+`;
+
+const StyledSidePanel = styled.aside`
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 300px;
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  background: var(--panel);
+  border-radius: 12px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5);
+  z-index: 15;
+`;

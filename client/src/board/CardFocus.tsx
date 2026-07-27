@@ -1,11 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import styled, { css } from "styled-components";
 import type { Card } from "@board/shared";
 import { api } from "../api";
+import { StyledButton } from "../ui/Button";
+import { StyledInput } from "../ui/Field";
+import { sheetFace, StyledCardPhoto } from "./CardFace";
 import { FoldCorner, foldSize } from "./FoldCorner";
 import { DeleteIcon, HideImageIcon } from "./icons";
 import { MiniCard } from "./MiniCard";
-import { RotateHandle } from "./RotateHandle";
-import { TidbitLines } from "./TidbitLines";
+import { RotateHandle, StyledRotateGrip, StyledRotateHandle } from "./RotateHandle";
+import { StyledFocusPad, TidbitLines } from "./TidbitLines";
 import { tearPaths } from "./tear";
 import { useCommittedField } from "./useCommittedField";
 import { useFocusFlight, type FocusFrom } from "./useFocusFlight";
@@ -89,56 +93,46 @@ export function CardFocus({
   const fields = (
     <>
       {editable ? (
-        <input
+        <StyledFocusTitleInput
           {...title}
           ref={titleRef}
-          className="focus-title focus-input"
           maxLength={200}
           placeholder="Name this card"
         />
       ) : (
-        card.title && <h2 className="focus-title">{card.title}</h2>
+        card.title && <StyledFocusTitle>{card.title}</StyledFocusTitle>
       )}
 
       {editable ? (
         <NoteField field={note} />
       ) : card.note ? (
-        <p className="focus-note">{card.note}</p>
+        <StyledFocusNote>{card.note}</StyledFocusNote>
       ) : (
-        !card.title && <p className="focus-note focus-note--muted">…</p>
+        !card.title && <StyledFocusNote $muted>…</StyledFocusNote>
       )}
     </>
   );
 
   return (
-    <div className="focus-backdrop" onPointerDown={requestClose}>
+    <StyledFocusBackdrop onPointerDown={requestClose}>
       {/* Pinned to the corner of the board, not to the card: the card's own
           top-right corner belongs to the fold. */}
-      <button
-        type="button"
-        className="focus-close"
-        aria-label="Close"
-        onClick={requestClose}
-      >
+      <StyledFocusClose type="button" aria-label="Close" onClick={requestClose}>
         ×
-      </button>
+      </StyledFocusClose>
 
-      <div
+      <StyledFocusShell
         ref={shellRef}
-        className={[
-          "focus-shell",
-          hasPhoto ? "focus-shell--print" : "",
-          open ? "is-open" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
+        $print={hasPhoto}
+        $open={open}
         // The card keeps the tilt it has on the board and the pad leans with
         // it, but each about its own centre — so the shell itself stays square
         // and the one control that must ignore the tilt can simply sit in it.
         style={{ "--tilt": card.rotation } as React.CSSProperties}
         onPointerDown={(e) => {
           e.stopPropagation();
-          if (!(e.target as HTMLElement).closest(".focus-delete")) setArmed(false);
+          // Anywhere but the bin itself disarms it.
+          if (!(e.target as HTMLElement).closest("[data-delete-zone]")) setArmed(false);
         }}
         role="dialog"
         aria-modal="true"
@@ -147,14 +141,13 @@ export function CardFocus({
         {/* What this card belongs to, small, sitting over it on a dotted rule
             that echoes the group's frame out on the board. */}
         {group && (
-          <div className="focus-plate">
+          <StyledFocusPlate>
             <MiniCard card={group} onOpen={onNavigate} />
-          </div>
+          </StyledFocusPlate>
         )}
 
-        <div
+        <StyledFocusCard
           ref={cardRef}
-          className={`focus-card ${hasPhoto ? "focus-card--print" : "focus-card--sheet"}`}
           style={{ transform: `rotate(${card.rotation}deg)` }}
         >
           {editable && (
@@ -174,8 +167,8 @@ export function CardFocus({
           )}
 
           {hasPhoto ? (
-            <div className="focus-face focus-face--print" style={{ clipPath: printClip }}>
-              <div className="card-photo focus-photo">
+            <StyledFocusFacePrint style={{ clipPath: printClip }}>
+              <StyledFocusPhoto>
                 <img
                   src={card.imageUrl!}
                   alt={card.title}
@@ -185,36 +178,31 @@ export function CardFocus({
                   }}
                 />
                 {editable && (
-                  <button
+                  <StyledFocusPhotoDel
                     type="button"
-                    className="focus-photo-del"
                     aria-label="Remove image"
                     title="Remove image"
                     onClick={() => save({ imageUrl: null })}
                   >
                     <HideImageIcon size={18} />
-                  </button>
+                  </StyledFocusPhotoDel>
                 )}
-              </div>
-              <div className="focus-caption">{fields}</div>
-            </div>
+              </StyledFocusPhoto>
+              <StyledFocusCaption>{fields}</StyledFocusCaption>
+            </StyledFocusFacePrint>
           ) : (
             <>
               {/* Pale fibre showing through the bites of the tear, as on the
                   board card — the face on top is clipped a little higher. */}
-              <div className="focus-fiber" style={{ clipPath: tear.fiber }} />
-              <div className="focus-face focus-face--sheet" style={{ clipPath: tear.face }}>
+              <StyledFocusFiber style={{ clipPath: tear.fiber }} />
+              <StyledFocusFaceSheet style={{ clipPath: tear.face }}>
                 {fields}
                 {editable && !urlOpen && (
-                  <button
-                    type="button"
-                    className="focus-add-photo"
-                    onClick={() => setUrlOpen(true)}
-                  >
+                  <StyledFocusAddPhoto type="button" onClick={() => setUrlOpen(true)}>
                     ＋ Add a photo
-                  </button>
+                  </StyledFocusAddPhoto>
                 )}
-              </div>
+              </StyledFocusFaceSheet>
             </>
           )}
 
@@ -224,24 +212,23 @@ export function CardFocus({
               onDone={() => setUrlOpen(false)}
             />
           )}
-        </div>
+        </StyledFocusCard>
 
         {editable && (
           /* Sits astride the seam between the card and its pad, square to the
              screen whatever angle the card leans at. Asks before it fires: a
              bin with no label should not lose a card in one press. */
-          <div className={`focus-delete ${armed ? "is-armed" : ""}`}>
-            {armed && <span className="focus-delete-ask">Delete this card?</span>}
-            <button
+          <StyledFocusDelete $armed={armed} data-delete-zone>
+            {armed && <StyledFocusDeleteAsk>Delete this card?</StyledFocusDeleteAsk>}
+            <StyledFocusDeleteBtn
               type="button"
-              className="focus-delete-btn"
               aria-label={armed ? "Confirm delete card" : "Delete card"}
               title={armed ? "Press again to delete" : "Delete card"}
               onClick={() => (armed ? onDelete(card.id) : setArmed(true))}
             >
               <DeleteIcon size={20} />
-            </button>
-          </div>
+            </StyledFocusDeleteBtn>
+          </StyledFocusDelete>
         )}
 
         {(editable || card.notepad.length > 0) && (
@@ -257,8 +244,8 @@ export function CardFocus({
             onOpen={onNavigate}
           />
         )}
-      </div>
-    </div>
+      </StyledFocusShell>
+    </StyledFocusBackdrop>
   );
 }
 
@@ -283,9 +270,9 @@ function MemberRow({
 }) {
   if (members.length === 0) {
     return editable ? (
-      <p className="focus-members-empty">
+      <StyledFocusMembersEmpty>
         Drag cards inside the frame to gather them here.
-      </p>
+      </StyledFocusMembersEmpty>
     ) : null;
   }
 
@@ -295,42 +282,40 @@ function MemberRow({
   const shown = members.slice(first, first + PER_PAGE);
 
   return (
-    <div className="focus-members">
-      <div className="focus-members-row">
+    <StyledFocusMembers>
+      <StyledFocusMembersRow>
         {pages > 1 && (
-          <button
+          <StyledMemberArrow
             type="button"
-            className="member-arrow"
             aria-label="Previous cards"
             disabled={current === 0}
             onClick={() => onPage(current - 1)}
           >
             ‹
-          </button>
+          </StyledMemberArrow>
         )}
-        <div className="focus-members-strip">
+        <StyledFocusMembersStrip>
           {shown.map((m) => (
             <MiniCard key={m.id} card={m} onOpen={onOpen} />
           ))}
-        </div>
+        </StyledFocusMembersStrip>
         {pages > 1 && (
-          <button
+          <StyledMemberArrow
             type="button"
-            className="member-arrow"
             aria-label="More cards"
             disabled={current >= pages - 1}
             onClick={() => onPage(current + 1)}
           >
             ›
-          </button>
+          </StyledMemberArrow>
         )}
-      </div>
+      </StyledFocusMembersRow>
       {pages > 1 && (
-        <p className="focus-members-count">
+        <StyledFocusMembersCount>
           {first + 1}–{first + shown.length} of {members.length}
-        </p>
+        </StyledFocusMembersCount>
       )}
-    </div>
+    </StyledFocusMembers>
   );
 }
 
@@ -351,10 +336,9 @@ function NoteField({ field }: { field: ReturnType<typeof useCommittedField> }) {
   }, [field.value]);
 
   return (
-    <textarea
+    <StyledFocusNoteInput
       {...field}
       ref={ref}
-      className="focus-note focus-input"
       maxLength={2000}
       rows={1}
       placeholder="What do they know?"
@@ -400,9 +384,9 @@ function PhotoUrlField({
   }
 
   return (
-    <div className="focus-url">
-      <div className="focus-url-row">
-        <input
+    <StyledFocusUrl>
+      <StyledFocusUrlRow>
+        <StyledFocusUrlInput
           ref={ref}
           value={value}
           placeholder="https://cdn.discordapp.com/…"
@@ -420,11 +404,449 @@ function PhotoUrlField({
             }
           }}
         />
-        <button type="button" className="btn" disabled={busy} onClick={() => void submit()}>
+        <StyledButton type="button" disabled={busy} onClick={() => void submit()}>
           Add
-        </button>
-      </div>
-      {error && <p className="focus-url-error">{error}</p>}
-    </div>
+        </StyledButton>
+      </StyledFocusUrlRow>
+      {error && <StyledFocusUrlError>{error}</StyledFocusUrlError>}
+    </StyledFocusUrl>
   );
 }
+
+/* ─── styles ───────────────────────────────────────────────────── */
+/* The board keeps panning behind a blur while a single card floats over it.
+   Layer order inside the focus card, from the back: the fold's well, the pale
+   fibre, the paper face, the turned corner, its hit area, then the two controls
+   that must never be cut away by the fold. Everything is stacked explicitly
+   because the fold is written before the paper it is torn from. */
+
+const StyledFocusBackdrop = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  padding: 22px;
+  overflow-y: auto;
+  background: rgba(20, 14, 8, 0.55);
+  backdrop-filter: blur(3px) saturate(0.85);
+  animation: focus-dim 160ms ease both;
+
+  @keyframes focus-dim {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`;
+
+const StyledFocusClose = styled.button`
+  position: absolute;
+  z-index: 8;
+  top: 14px;
+  right: 16px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #2a2118;
+  color: #f6e5c9;
+  font-size: 21px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+
+  &:hover {
+    background: var(--accent);
+  }
+`;
+
+const StyledFocusCard = styled.div`
+  position: relative;
+  /* Above the pad below it: the filter makes the card its own stacking context,
+     so the floating URL field can only outrank the pad from out here. */
+  z-index: 2;
+  width: 100%;
+  /* The shadow lives out here: clip-path is applied after filter, so a shadow
+     on the clipped face would be cut away with the folded corner. */
+  filter: drop-shadow(0 20px 32px rgba(0, 0, 0, 0.5));
+`;
+
+const focusFace = css`
+  position: relative;
+  z-index: 2;
+  transition: clip-path 180ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`;
+
+const StyledFocusFacePrint = styled.div`
+  ${focusFace}
+  padding: 14px 14px 0;
+  background: #fdfdf7;
+`;
+
+const StyledFocusFaceSheet = styled.div`
+  ${focusFace}
+  ${sheetFace}
+  padding: 26px 26px 40px;
+`;
+
+/* Positioned so the hide-image button lands in the print's own corner rather
+   than the face's, which is where the unpositioned photo box would send it. */
+const StyledFocusPhoto = styled(StyledCardPhoto)`
+  position: relative;
+`;
+
+const StyledFocusFiber = styled.div`
+  position: absolute;
+  z-index: 1;
+  inset: 0 0 -5px 0;
+  background: #fbf3e0;
+`;
+
+const StyledFocusCaption = styled.div`
+  padding: 14px 6px 18px;
+  text-align: center;
+`;
+
+/* Written on straight away rather than in a panel: no box, just a ruled line
+   under the words that firms up as you reach for it. Layered *after* the
+   typography below so its `color: inherit` still wins, as it did in the sheet. */
+const focusInput = css`
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 4px;
+  background: transparent;
+  color: inherit;
+  text-align: inherit;
+  resize: none;
+  overflow: hidden;
+  box-shadow: inset 0 -1px 0 rgba(90, 74, 46, 0.16);
+
+  &::placeholder {
+    color: rgba(90, 74, 46, 0.35);
+  }
+  &:hover {
+    box-shadow: inset 0 -1px 0 rgba(90, 74, 46, 0.4);
+  }
+  &:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+`;
+
+const focusTitle = css`
+  margin: 0;
+  font-family: var(--hand);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: #23303e;
+`;
+
+const StyledFocusTitle = styled.h2`
+  ${focusTitle}
+`;
+
+const StyledFocusTitleInput = styled.input`
+  ${focusTitle}
+  ${focusInput}
+`;
+
+const focusNote = css`
+  margin: 8px 0 0;
+  font-family: var(--hand);
+  font-size: 22px;
+  line-height: 1.25;
+  color: #3a4653;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+`;
+
+const StyledFocusNote = styled.p<{ $muted?: boolean }>`
+  ${focusNote}
+  ${(p) =>
+    p.$muted &&
+    css`
+      color: #c1b79c;
+    `}
+`;
+
+const StyledFocusNoteInput = styled.textarea`
+  ${focusNote}
+  ${focusInput}
+`;
+
+const StyledFocusAddPhoto = styled.button`
+  margin: 18px 0 0;
+  padding: 6px 13px;
+  border: 1px dashed rgba(90, 74, 46, 0.45);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.35);
+  color: #6b5c44;
+  font-family: var(--ui);
+  font-size: 13px;
+  cursor: pointer;
+
+  &:hover {
+    background: #fff;
+  }
+`;
+
+/* Inside the print, at the far corner from the fold — the two controls on this
+   card never crowd each other. */
+const StyledFocusPhotoDel = styled.button`
+  position: absolute;
+  z-index: 5;
+  right: 8px;
+  bottom: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 14, 8, 0.6);
+  color: #fff;
+  cursor: pointer;
+  transition: background 150ms ease;
+
+  &:hover {
+    background: var(--accent);
+  }
+`;
+
+const StyledFocusUrl = styled.div`
+  position: absolute;
+  z-index: 6;
+  left: 10px;
+  right: 10px;
+  top: calc(100% + 10px);
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.5);
+`;
+
+const StyledFocusUrlRow = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
+const StyledFocusUrlInput = styled(StyledInput)`
+  flex: 1;
+  min-width: 0;
+
+  &:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+`;
+
+const StyledFocusUrlError = styled.p`
+  margin: 8px 2px 0;
+  font-size: 12px;
+  color: #a3301b;
+`;
+
+/* The group a focused card belongs to, standing over it on a dotted rule that
+   echoes the frame the group draws on the board. */
+const StyledFocusPlate = styled.div`
+  display: flex;
+  justify-content: center;
+  padding-bottom: 10px;
+  border-bottom: 2px dotted rgba(246, 229, 201, 0.4);
+`;
+
+/* What is inside a focused group. */
+const StyledFocusMembers = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+`;
+
+const StyledFocusMembersRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+/* Always as wide as five minis, so the row holds still as the pages turn — it
+   ends up wider than the card above it, which reads as a tray under a shelf.
+   Only a narrow window makes it scroll. */
+const StyledFocusMembersStrip = styled.div`
+  display: flex;
+  gap: 8px;
+  width: calc(5 * 104px + 4 * 8px);
+  max-width: calc(100vw - 120px);
+  overflow-x: auto;
+  justify-content: center;
+`;
+
+const StyledMemberArrow = styled.button`
+  flex: none;
+  width: 30px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(20, 14, 8, 0.55);
+  color: #f6e5c9;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--accent);
+  }
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+`;
+
+const membersNote = css`
+  margin: 0;
+  color: #e8dbbe;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+`;
+
+const StyledFocusMembersCount = styled.p`
+  ${membersNote}
+`;
+
+const StyledFocusMembersEmpty = styled.p`
+  ${membersNote}
+  text-align: center;
+  font-family: var(--hand);
+  font-size: 17px;
+  opacity: 0.75;
+`;
+
+/* One button for one destructive action, sitting astride the seam between the
+   card and its pad. A zero-height flex row: it adds a second gap to the gutter,
+   so the button straddles the join without covering either surface's text, and
+   nothing about the layout depends on how tall the card happens to be. */
+const StyledFocusDeleteBtn = styled.button`
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #2a2118;
+  color: #f6e5c9;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5);
+  transition: background 150ms ease;
+
+  &:hover {
+    background: var(--accent);
+  }
+`;
+
+const StyledFocusDelete = styled.div<{ $armed: boolean }>`
+  position: relative;
+  z-index: 3;
+  height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  ${(p) =>
+    p.$armed &&
+    css`
+      ${StyledFocusDeleteBtn} {
+        background: var(--accent);
+      }
+    `}
+`;
+
+const StyledFocusDeleteAsk = styled.span`
+  position: absolute;
+  left: calc(50% + 30px);
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+`;
+
+/* `margin: auto` rather than centred flex alignment: a card taller than the
+   stage then scrolls instead of having its top cut off. */
+const StyledFocusShell = styled.div<{ $print: boolean; $open: boolean }>`
+  position: relative;
+  margin: auto;
+  width: min(460px, 86vw);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* The shell stays square: the card and the pad each lean by --tilt about
+     their own centre, which keeps their facing edges parallel and leaves the
+     bin free to sit at the card's bottom centre whatever the angle. The flight
+     in and out is animated from useFocusFlight, not from here. */
+  will-change: transform;
+
+  /* A print is square plus its caption, so it is the height that runs out
+     first; the print's width is what has to give to keep the card in view. */
+  ${(p) =>
+    p.$print &&
+    css`
+      width: min(460px, 86vw, 46vh);
+    `}
+
+  /* The pad and the bin belong to the reading of the card, not to the paper —
+     they arrive once it has landed. Opacity only: anything that moved the
+     layout mid-flight would invalidate the geometry it was measured from. */
+  ${StyledFocusPad},
+  ${StyledFocusDelete},
+  ${StyledFocusPlate},
+  ${StyledFocusMembers},
+  ${StyledFocusMembersEmpty} {
+    transition: opacity 180ms ease;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  }
+
+  ${(p) =>
+    !p.$open &&
+    css`
+      ${StyledFocusPad},
+      ${StyledFocusDelete},
+      ${StyledFocusPlate},
+      ${StyledFocusMembers},
+      ${StyledFocusMembersEmpty} {
+        opacity: 0;
+      }
+    `}
+
+  /* The one card being worked on keeps its rotate handle out, arriving with the
+     pad and the bin once the paper has landed. */
+  ${(p) =>
+    p.$open &&
+    css`
+      ${StyledRotateHandle} {
+        opacity: 1;
+      }
+      ${StyledRotateGrip} {
+        pointer-events: auto;
+      }
+    `}
+`;

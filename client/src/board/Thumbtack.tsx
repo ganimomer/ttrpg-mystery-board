@@ -1,3 +1,5 @@
+import styled from "styled-components";
+
 interface Props {
   color?: string;
   size?: number;
@@ -6,11 +8,10 @@ interface Props {
 /** A little pushpin, drawn head-on, casting a soft shadow. */
 export function Thumbtack({ color = "#d63031", size = 26 }: Props) {
   return (
-    <svg
+    <StyledThumbtack
       width={size}
       height={size}
       viewBox="0 0 32 32"
-      className="thumbtack"
       aria-hidden="true"
     >
       <ellipse cx="16" cy="26" rx="7" ry="2.5" fill="rgba(0,0,0,0.28)" />
@@ -25,6 +26,12 @@ export function Thumbtack({ color = "#d63031", size = 26 }: Props) {
           <stop offset="100%" stopColor="rgba(0,0,0,0.35)" />
         </radialGradient>
       </defs>
-    </svg>
+    </StyledThumbtack>
   );
 }
+
+/* ─── styles ───────────────────────────────────────────────────── */
+
+const StyledThumbtack = styled.svg`
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.4));
+`;

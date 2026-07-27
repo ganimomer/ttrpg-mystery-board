@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { StyledButton } from "../ui/Button";
+import { StyledCenterMessage } from "../ui/CenterMessage";
 
 interface Props {
   token: string;
@@ -23,15 +25,15 @@ export function JoinHandler({ token, onJoined, onCancel }: Props) {
   }, [token, onJoined]);
 
   return (
-    <div className="center-msg">
+    <StyledCenterMessage>
       {error ? (
         <>
           <p>{error}</p>
-          <button className="btn" onClick={onCancel}>Go to my boards</button>
+          <StyledButton onClick={onCancel}>Go to my boards</StyledButton>
         </>
       ) : (
         <p>Joining the board…</p>
       )}
-    </div>
+    </StyledCenterMessage>
   );
 }

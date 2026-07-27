@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import styled, { css } from "styled-components";
 import { RotateIcon } from "./icons";
 
 /** The tilt a GM may give a card. The server itself allows ±45. */
@@ -34,7 +35,6 @@ export function RotateHandle({ rotation, targetRef, onTilt }: Props) {
     startRotation: number;
   } | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [focused, setFocused] = useState(false);
 
   /** Angle of the pointer about the card's centre, in degrees. */
   function angleAt(e: React.PointerEvent): number | null {
@@ -89,13 +89,10 @@ export function RotateHandle({ rotation, targetRef, onTilt }: Props) {
     onTilt(clamp(rotation + step), true);
   }
 
-  const showing = dragging || focused;
-
   return (
-    <div className={`rotate-handle ${showing ? "is-active" : ""}`}>
-      <button
+    <StyledRotateHandle $dragging={dragging} data-nodrag>
+      <StyledRotateGrip
         type="button"
-        className="rotate-grip"
         role="slider"
         aria-label="Tilt"
         aria-valuenow={rotation}
@@ -107,16 +104,118 @@ export function RotateHandle({ rotation, targetRef, onTilt }: Props) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        /* Only a keyboard visit shows the pill — a press already shows it via
-           `dragging`, and it should not hang around after the mouse is let go. */
-        onFocus={(e) => setFocused(e.currentTarget.matches(":focus-visible"))}
-        onBlur={() => setFocused(false)}
         onKeyDown={onKeyDown}
         onClick={(e) => e.stopPropagation()}
       >
         <RotateIcon size={18} />
-      </button>
-      {showing && <span className="tilt-pill">{rotation}°</span>}
-    </div>
+      </StyledRotateGrip>
+      {/* Redundant with the slider's own aria-valuetext, and never read aloud. */}
+      <StyledTiltPill $dragging={dragging} aria-hidden>
+        {rotation}°
+      </StyledTiltPill>
+    </StyledRotateHandle>
   );
 }
+
+/* ─── styles ───────────────────────────────────────────────────── */
+
+/* The rotate arrow off a card's top-left corner. On a board card it waits until
+   the card is under the pointer; on the focused card — the one card being worked
+   on — it simply stays, arriving with the pad and the bin once the card lands.
+   Both of those reveals belong to the ancestor, so `Card` and `CardFocus`
+   interpolate this component and its grip into their own rules.
+
+   The wrapper is always hit-testable, and it is the *grip* whose pointer-events
+   are gated. That asymmetry is what makes the handle reachable at all: it sits
+   outside the card's box, so if the whole handle went `pointer-events: none`
+   while hidden, the pointer would cross ground belonging to neither the card nor
+   the handle, lose `:hover`, and the handle would become untouchable exactly as
+   you arrived at it — with no way to bring it back. Hovering the wrapper keeps
+   the card's `:hover` true, since it is one of the card's own children, so the
+   reveal holds from any direction. Nothing can be rotated by accident meanwhile:
+   while the handle is hidden the wrapper is inert, and pressing it does nothing.
+   It laps 4px over the card's corner as well, so the natural diagonal approach
+   never even starts the fade. */
+export const StyledRotateGrip = styled.button`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #2a2118;
+  color: #f6e5c9;
+  cursor: grab;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  touch-action: none;
+  pointer-events: none;
+
+  &:active {
+    cursor: grabbing;
+    background: var(--accent);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+`;
+
+export const StyledRotateHandle = styled.div<{ $dragging: boolean }>`
+  position: absolute;
+  z-index: 6;
+  top: -34px;
+  left: -34px;
+  width: 38px;
+  height: 38px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+
+  &:focus-within {
+    opacity: 1;
+  }
+  &:focus-within ${StyledRotateGrip} {
+    pointer-events: auto;
+  }
+
+  ${(p) =>
+    p.$dragging &&
+    css`
+      opacity: 1;
+      ${StyledRotateGrip} {
+        pointer-events: auto;
+      }
+    `}
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`;
+
+/* Only a keyboard visit shows the pill, which `:focus-visible` decides on its
+   own — and a press shows it via `$dragging`, since a pointer capture keeps the
+   gesture alive after the pointer has left the grip and `:active` has not. */
+const StyledTiltPill = styled.span<{ $dragging: boolean }>`
+  position: absolute;
+  top: 3px;
+  left: 38px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: #2a2118;
+  color: #f6e5c9;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: rotate(calc(var(--tilt, 0) * -1deg));
+  transform-origin: left center;
+  opacity: ${(p) => (p.$dragging ? 1 : 0)};
+
+  ${StyledRotateGrip}:focus-visible ~ & {
+    opacity: 1;
+  }
+`;

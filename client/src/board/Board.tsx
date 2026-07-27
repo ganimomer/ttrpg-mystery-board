@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import styled from "styled-components";
 import type { Card as CardData, Connection } from "@board/shared";
 import { Card } from "./Card";
 import { GroupFrame, groupCards } from "./GroupFrame";
@@ -136,18 +137,18 @@ export function Board({
   };
 
   return (
-    <div
+    <StyledBoardViewport
       ref={containerRef}
-      className="board-viewport"
       onWheel={onWheel}
       onPointerMove={handleContainerPointerMove}
       onPointerUp={onBackgroundPointerUp}
     >
       {/* Background layer captures pan + empty clicks. */}
-      <div className="board-bg" onPointerDown={handleBackgroundDown} />
+      <StyledBoardBg onPointerDown={handleBackgroundDown} />
 
-      <div
-        className="board-surface"
+      <StyledBoardSurface
+        // Rewritten on every pan and wheel frame, so it stays an inline style
+        // rather than a prop — a class per pixel of travel would thrash.
         style={{
           transform: `translate(${vp.panX}px, ${vp.panY}px) scale(${vp.zoom})`,
         }}
@@ -183,11 +184,62 @@ export function Board({
         ))}
 
         <StringLayer {...stringProps} layer="art" />
-      </div>
+      </StyledBoardSurface>
 
       {pendingFrom && (
-        <div className="board-hint">Click another card’s tack to tie the string · Esc / click empty to cancel</div>
+        <StyledBoardHint>
+          Click another card’s tack to tie the string · Esc / click empty to cancel
+        </StyledBoardHint>
       )}
-    </div>
+    </StyledBoardViewport>
   );
 }
+
+/* ─── styles ───────────────────────────────────────────────────── */
+
+const StyledBoardViewport = styled.div`
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  background-color: var(--cork);
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.06) 0 2px, transparent 3px),
+    radial-gradient(circle at 70% 60%, rgba(0, 0, 0, 0.08) 0 2px, transparent 3px),
+    radial-gradient(circle at 40% 80%, rgba(0, 0, 0, 0.06) 0 1.5px, transparent 3px),
+    radial-gradient(circle at 85% 20%, rgba(255, 255, 255, 0.05) 0 1.5px, transparent 3px),
+    linear-gradient(0deg, var(--cork-dark), var(--cork));
+  background-size: 40px 40px, 55px 55px, 34px 34px, 48px 48px, 100% 100%;
+  box-shadow: inset 0 0 160px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+`;
+
+const StyledBoardBg = styled.div`
+  position: absolute;
+  inset: 0;
+`;
+
+const StyledBoardSurface = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+`;
+
+const StyledBoardHint = styled.div`
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fbead0;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  pointer-events: none;
+`;

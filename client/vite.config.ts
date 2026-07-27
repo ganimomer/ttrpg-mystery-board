@@ -6,7 +6,9 @@ import { defineConfig } from "vite";
 // browser only ever talks to one origin (first-party cookies, no CORS, and
 // relative /api paths that also work inside a Discord Activity).
 export default defineConfig({
-  plugins: [react()],
+  // The babel plugin gives every styled component a readable class name in
+  // devtools (`Card__StyledCard-xxx`) instead of a bare hash.
+  plugins: [react({ babel: { plugins: ["babel-plugin-styled-components"] } })],
   // Read VITE_* vars (e.g. VITE_DISCORD_CLIENT_ID) from the repo-root .env.
   envDir: fileURLToPath(new URL("..", import.meta.url)),
   server: {

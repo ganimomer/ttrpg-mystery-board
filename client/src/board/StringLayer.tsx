@@ -1,3 +1,4 @@
+import styled, { css } from "styled-components";
 import type { Card, Connection } from "@board/shared";
 import { tackAnchor } from "./layout";
 
@@ -56,8 +57,8 @@ export function StringLayer({
   const SPAN = 20000;
   const HALF = SPAN / 2;
   return (
-    <svg
-      className={`string-layer string-layer--${layer}`}
+    <StyledStringLayer
+      $art={layer === "art"}
       style={{ left: -HALF, top: -HALF, width: SPAN, height: SPAN }}
       viewBox={`${-HALF} ${-HALF} ${SPAN} ${SPAN}`}
       aria-hidden="true"
@@ -70,14 +71,12 @@ export function StringLayer({
           tackAnchor(from.x, from.y),
           tackAnchor(to.x, to.y),
         );
-        const dim = conn.revealed ? "" : "string--hidden";
         return (
-          <g key={conn.id} className={selectedId === conn.id ? "string--selected" : ""}>
+          <StyledStringGroup key={conn.id} $selected={selectedId === conn.id}>
             {/* Wide invisible hit area for easy selection */}
             {layer === "hit" && editable && (
-              <path
+              <StyledStringHit
                 d={d}
-                className="string-hit"
                 onPointerDown={(e) => {
                   e.stopPropagation();
                   onSelect(conn.id);
@@ -85,12 +84,11 @@ export function StringLayer({
               />
             )}
             {layer === "art" && (
-              <path d={d} className={`string ${dim}`} stroke={conn.color} />
+              <StyledString d={d} $hidden={!conn.revealed} stroke={conn.color} />
             )}
             {layer === "art" && conn.label && (
-              <g
+              <StyledStringTag
                 transform={`translate(${tag.x}, ${tag.y}) rotate(${tag.angle})`}
-                className="string-tag"
                 onPointerDown={
                   editable
                     ? (e) => {
@@ -100,34 +98,108 @@ export function StringLayer({
                     : undefined
                 }
               >
-                <rect
+                <StyledStringTagBg
                   x={-Math.max(28, conn.label.length * 4.4)}
                   y={-11}
                   width={Math.max(56, conn.label.length * 8.8)}
                   height={22}
                   rx={3}
-                  className="string-tag-bg"
                 />
-                <text textAnchor="middle" dominantBaseline="central" className="string-tag-text">
+                <StyledStringTagText textAnchor="middle" dominantBaseline="central">
                   {conn.label}
-                </text>
-              </g>
+                </StyledStringTagText>
+              </StyledStringTag>
             )}
-          </g>
+          </StyledStringGroup>
         );
       })}
 
       {layer === "art" && pending && cards[pending.fromCardId] && (
-        <path
+        <StyledPendingString
           d={
             stringGeometry(
               tackAnchor(cards[pending.fromCardId].x, cards[pending.fromCardId].y),
               { x: pending.toX, y: pending.toY },
             ).d
           }
-          className="string string--pending"
         />
       )}
-    </svg>
+    </StyledStringLayer>
   );
 }
+
+/* ─── styles ───────────────────────────────────────────────────── */
+
+const StyledStringLayer = styled.svg<{ $art: boolean }>`
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+  /* Visible strings hang in front of the cards; their click targets stay behind
+     them (default z-index) so a string can't cover the tack it hangs from. */
+  ${(p) =>
+    p.$art &&
+    css`
+      z-index: 2;
+    `}
+`;
+
+const string = css`
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.35));
+`;
+
+const StyledString = styled.path<{ $hidden: boolean }>`
+  ${string}
+  ${(p) =>
+    p.$hidden &&
+    css`
+      stroke-dasharray: 6 6;
+      opacity: 0.5;
+    `}
+`;
+
+const StyledPendingString = styled.path`
+  ${string}
+  stroke: #fff;
+  stroke-dasharray: 4 6;
+  opacity: 0.85;
+`;
+
+const StyledStringHit = styled.path`
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16;
+  pointer-events: stroke;
+  cursor: pointer;
+`;
+
+const StyledStringGroup = styled.g<{ $selected: boolean }>`
+  ${(p) =>
+    p.$selected &&
+    css`
+      ${StyledString} {
+        stroke-width: 4;
+      }
+    `}
+`;
+
+const StyledStringTag = styled.g`
+  pointer-events: auto;
+  cursor: pointer;
+`;
+
+const StyledStringTagBg = styled.rect`
+  fill: #fff8e7;
+  stroke: #cbbb95;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+`;
+
+const StyledStringTagText = styled.text`
+  font-family: var(--hand);
+  font-size: 15px;
+  fill: #4a3b26;
+`;

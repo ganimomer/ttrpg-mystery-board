@@ -5,6 +5,7 @@ import { BoardView } from "./board/BoardView";
 import { BoardList } from "./screens/BoardList";
 import { JoinHandler } from "./screens/JoinHandler";
 import { LoginScreen } from "./screens/LoginScreen";
+import { StyledCenterMessage } from "./ui/CenterMessage";
 
 const PENDING_JOIN_KEY = "pendingJoinToken";
 
@@ -50,7 +51,7 @@ export default function App() {
     await refresh();
   }
 
-  if (loading) return <div className="center-msg">Loading…</div>;
+  if (loading) return <StyledCenterMessage>Loading…</StyledCenterMessage>;
 
   const pendingToken = pendingFromUrl ?? localStorage.getItem(PENDING_JOIN_KEY);
 
