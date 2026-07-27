@@ -1,3 +1,4 @@
+import { findStringBetween } from "@board/shared";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
@@ -16,6 +17,17 @@ export const connectionsRoutes = new Hono<AppEnv>();
 connectionsRoutes.use("*", requireAuth, requireBoardMember);
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
+
+const ALREADY_TIED = "These cards are already strung together";
+
+/** Postgres unique_violation, i.e. the pair index rejected the row. */
+function isUniqueViolation(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    (e as { code?: unknown }).code === "23505"
+  );
+}
 
 const createSchema = z.object({
   fromCardId: z.string(),
@@ -56,16 +68,34 @@ connectionsRoutes.post("/", requireBoardGM, async (c) => {
     return c.json({ error: "Both cards must be on this board" }, 400);
   }
 
+  // One string per pair of cards. A board carries few enough of them that
+  // reading the lot and asking the shared predicate beats a bespoke query.
+  const existing = await db
+    .select({
+      fromCardId: schema.connections.fromCardId,
+      toCardId: schema.connections.toCardId,
+    })
+    .from(schema.connections)
+    .where(eq(schema.connections.boardId, boardId));
+  if (findStringBetween(existing, d)) return c.json({ error: ALREADY_TIED }, 409);
+
   const id = nanoid();
-  await db.insert(schema.connections).values({
-    id,
-    boardId,
-    fromCardId: d.fromCardId,
-    toCardId: d.toCardId,
-    label: d.label ?? "",
-    color: d.color ?? "#c0392b",
-    revealed: d.revealed ?? false,
-  });
+  try {
+    await db.insert(schema.connections).values({
+      id,
+      boardId,
+      fromCardId: d.fromCardId,
+      toCardId: d.toCardId,
+      label: d.label ?? "",
+      color: d.color ?? "#c0392b",
+      revealed: d.revealed ?? false,
+    });
+  } catch (e) {
+    // Two GMs tacking the same pair at once: the unique index is the real
+    // guard, the read above is only there to give a friendly answer first.
+    if (isUniqueViolation(e)) return c.json({ error: ALREADY_TIED }, 409);
+    throw e;
+  }
 
   const conn = (await loadConnection(id))!;
   await publishConnectionUpsert(conn);

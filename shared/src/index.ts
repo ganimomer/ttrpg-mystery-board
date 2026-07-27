@@ -67,6 +67,33 @@ export interface Connection {
   revealed: boolean;
 }
 
+/** The two ends of a string. */
+export interface CardPair {
+  fromCardId: string;
+  toCardId: string;
+}
+
+/**
+ * Strings are undirected: A→B and B→A are the same string. Nothing renders a
+ * direction — the curve sags from the midpoint and carries no arrowhead — so
+ * two such rows would draw the identical line. One string per pair is the rule
+ * the client, the API and a unique index all enforce; this is its definition.
+ */
+export function samePair(a: CardPair, b: CardPair): boolean {
+  return (
+    (a.fromCardId === b.fromCardId && a.toCardId === b.toCardId) ||
+    (a.fromCardId === b.toCardId && a.toCardId === b.fromCardId)
+  );
+}
+
+/** The string already tied between `pair`'s two cards, if there is one. */
+export function findStringBetween<T extends CardPair>(
+  connections: T[],
+  pair: CardPair,
+): T | undefined {
+  return connections.find((c) => samePair(c, pair));
+}
+
 /** Everything needed to render a board in one payload. */
 export interface BoardSnapshot {
   board: Board;

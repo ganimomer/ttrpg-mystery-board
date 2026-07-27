@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -6,6 +7,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const createdAt = () =>
@@ -97,7 +99,16 @@ export const connections = pgTable(
     revealed: boolean("revealed").notNull().default(false),
     createdAt: createdAt(),
   },
-  (t) => [index("connections_board_idx").on(t.boardId)],
+  (t) => [
+    index("connections_board_idx").on(t.boardId),
+    // One string per pair of cards, either direction — see bootstrapSchema,
+    // which is what actually builds this.
+    uniqueIndex("connections_pair_uniq").on(
+      t.boardId,
+      sql`LEAST(${t.fromCardId}, ${t.toCardId})`,
+      sql`GREATEST(${t.fromCardId}, ${t.toCardId})`,
+    ),
+  ],
 );
 
 export const noteItems = pgTable(

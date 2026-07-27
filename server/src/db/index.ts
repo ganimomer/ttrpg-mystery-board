@@ -81,6 +81,17 @@ export async function bootstrapSchema(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS connections_board_idx ON connections(board_id);
+    -- One string per pair of cards, in either direction: A→B and B→A draw the
+    -- same curve, so a second row is only ever clutter. Extras are dropped
+    -- first (oldest wins, id breaks ties) or the index below can't be built.
+    DELETE FROM connections c
+    USING connections keep
+    WHERE c.board_id = keep.board_id
+      AND LEAST(c.from_card_id, c.to_card_id) = LEAST(keep.from_card_id, keep.to_card_id)
+      AND GREATEST(c.from_card_id, c.to_card_id) = GREATEST(keep.from_card_id, keep.to_card_id)
+      AND (c.created_at, c.id) > (keep.created_at, keep.id);
+    CREATE UNIQUE INDEX IF NOT EXISTS connections_pair_uniq ON connections
+      (board_id, LEAST(from_card_id, to_card_id), GREATEST(from_card_id, to_card_id));
 
     CREATE TABLE IF NOT EXISTS note_items (
       id TEXT PRIMARY KEY,

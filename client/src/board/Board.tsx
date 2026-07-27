@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import styled from "styled-components";
+import { findStringBetween } from "@board/shared";
 import type { Card as CardData, Connection } from "@board/shared";
 import { Card } from "./Card";
 import { GroupFrame, groupCards } from "./GroupFrame";
@@ -95,7 +96,14 @@ export function Board({
     if (pendingFrom === null) {
       setPendingFrom(cardId);
     } else if (pendingFrom !== cardId) {
-      onCreateConnection(pendingFrom, cardId);
+      // Only one string per pair — tacking an already-strung card hands back
+      // the string that is already there rather than laying a second one over it.
+      const existing = findStringBetween(Object.values(connections), {
+        fromCardId: pendingFrom,
+        toCardId: cardId,
+      });
+      if (existing) onSelectConnection(existing.id);
+      else onCreateConnection(pendingFrom, cardId);
       setPendingFrom(null);
       setCursor(null);
     } else {
