@@ -34,6 +34,13 @@ body {
   background: #2a2018;
 }
 
+/* Material Symbols, inlined by icons.tsx. Block so it never picks up the
+   line-height of the text around it. */
+.icon {
+  display: block;
+  flex: none;
+}
+
 /* ─── Buttons & fields ─────────────────────────────────────────── */
 .btn {
   font-family: var(--ui);
@@ -83,11 +90,6 @@ textarea {
   background: white;
   color: var(--ink);
   width: 100%;
-}
-textarea.note-input {
-  font-family: var(--hand);
-  font-size: 20px;
-  line-height: 1.2;
 }
 
 /* ─── Centered messages ────────────────────────────────────────── */
@@ -342,6 +344,7 @@ textarea.note-input {
   position: absolute;
   z-index: 1;
   user-select: none;
+  cursor: pointer; /* every card can be brought closer */
 }
 .card-inner {
   position: relative;
@@ -362,15 +365,17 @@ textarea.note-input {
 .card.is-editable:active {
   cursor: grabbing;
 }
-.card.is-selected .card-inner {
-  box-shadow: 0 0 0 3px var(--accent), 0 14px 26px rgba(0, 0, 0, 0.5);
-}
 .card.is-connect-target .card-inner {
   box-shadow: 0 0 0 3px #2d9c5a, 0 14px 26px rgba(0, 0, 0, 0.5);
 }
 .card.is-hidden {
   opacity: 0.55;
   filter: grayscale(0.4);
+}
+/* The focus view is holding this one: its board self stands aside, so the two
+   are never seen at once, while its strings keep hanging from the same spot. */
+.card.is-focused {
+  opacity: 0;
 }
 .card.is-hidden .card-inner::after,
 .card.is-hidden .card-sheet-face::after {
@@ -395,18 +400,18 @@ textarea.note-input {
   right: 6px;
   bottom: -22px;
   height: 74px;
-  padding: 0;
-  border: none;
   border-radius: 2px 2px 3px 3px;
-  cursor: pointer;
   transform: rotate(2.5deg);
   background-color: #fdf6b2;
   background-image:
     linear-gradient(90deg, transparent 16px, #f6c6c0 16px, #f6c6c0 17px, transparent 17px),
     repeating-linear-gradient(#fdf6b2 0 21px, #cdd9e6 21px 22px);
   box-shadow: 0 8px 14px rgba(0, 0, 0, 0.32);
+  transition: bottom 0.15s ease;
 }
-.notepad-peek:hover {
+/* Slides out a little under the pointer — a hint that focusing the card will
+   unfold the whole pad. */
+.card:hover .notepad-peek {
   bottom: -28px;
 }
 .notepad-peek-count {
@@ -494,13 +499,8 @@ textarea.note-input {
   filter: drop-shadow(0 9px 14px rgba(0, 0, 0, 0.42));
   transition: filter 0.15s ease;
 }
-/* The selection ring is four hard offset shadows rather than a box-shadow ring,
-   which would be a rectangle around a torn card. */
-.card.is-selected .card-sheet {
-  filter: drop-shadow(2px 0 0 var(--accent)) drop-shadow(-2px 0 0 var(--accent))
-    drop-shadow(0 2px 0 var(--accent)) drop-shadow(0 -2px 0 var(--accent))
-    drop-shadow(0 12px 18px rgba(0, 0, 0, 0.5));
-}
+/* The ring is four hard offset shadows rather than a box-shadow ring, which
+   would be a rectangle around a torn card. */
 .card.is-connect-target .card-sheet {
   filter: drop-shadow(2px 0 0 #2d9c5a) drop-shadow(-2px 0 0 #2d9c5a)
     drop-shadow(0 2px 0 #2d9c5a) drop-shadow(0 -2px 0 #2d9c5a)
@@ -514,7 +514,9 @@ textarea.note-input {
   background: #fbf3e0;
   clip-path: var(--tear-fiber);
 }
-.card-sheet-face {
+/* Also worn by the focused card's sheet — same stock, read at arm's length. */
+.card-sheet-face,
+.focus-face--sheet {
   position: relative;
   z-index: 1;
   padding: 16px 16px 26px;
@@ -570,16 +572,9 @@ textarea.note-input {
   color: #b3a889;
 }
 .card-sheet-tidbits {
-  display: block;
-  width: 100%;
   margin: 10px 0 0;
   padding: 8px 0 0;
-  border: none;
   border-top: 1px solid rgba(90, 74, 46, 0.28);
-  background: none;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
 }
 .card-sheet-tidbit {
   display: block;
@@ -603,13 +598,6 @@ textarea.note-input {
 /* GM-only: a tidbit the players have not been shown yet. */
 .card-sheet-tidbit.is-hidden {
   opacity: 0.5;
-}
-.card-sheet-tidbit--add {
-  color: #9a8f74;
-}
-.card-sheet-tidbits:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 /* ─── Strings ──────────────────────────────────────────────────── */
@@ -707,23 +695,13 @@ textarea.note-input {
 .field input[type="range"] {
   padding: 0;
 }
-.photo-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.photo-thumb {
-  width: 46px;
-  height: 46px;
-  object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid #d8ccb6;
-}
 .reveal-toggle {
   border: none;
   border-radius: 20px;
-  padding: 6px 12px;
+  padding: 6px 12px 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -750,55 +728,11 @@ textarea.note-input {
   transform: scale(1.12);
 }
 
-/* ─── Notepad overlay (pulled-out lined pad) ───────────────────── */
-.notepad-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  display: grid;
-  place-items: center;
-  background: rgba(20, 14, 8, 0.5);
-}
-.notepad-sheet {
-  width: min(440px, 92%);
-  max-height: 82%;
-  display: flex;
-  flex-direction: column;
-  padding: 18px 20px 16px;
-  border-radius: 3px;
-  transform: rotate(-1deg);
-  color: #33302a;
-  background-color: #fdf6b2;
-  background-image:
-    linear-gradient(90deg, transparent 40px, #f6c6c0 40px, #f6c6c0 41px, transparent 41px),
-    repeating-linear-gradient(#fdf6b2 0 27px, #cdd9e6 27px 28px);
-  box-shadow: 0 26px 50px rgba(0, 0, 0, 0.55);
-}
-.notepad-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-left: 46px;
-}
-.notepad-head h3 {
-  margin: 0;
-  font-family: var(--hand);
-  font-size: 28px;
-  font-weight: 700;
-}
-.notepad-close {
-  border: none;
-  background: none;
-  font-size: 26px;
-  line-height: 1;
-  cursor: pointer;
-  color: #7a6a52;
-}
+/* ─── The notepad's lines (on the focused card's pad) ──────────── */
 .notepad-lines {
   list-style: none;
-  margin: 8px 0 0;
+  margin: 0;
   padding: 0;
-  overflow-y: auto;
 }
 .notepad-line {
   display: flex;
@@ -825,6 +759,12 @@ textarea.note-input {
   font-size: 15px;
   line-height: 1;
   flex: none;
+  display: grid;
+  place-items: center;
+}
+/* An unrevealed line is already dimmed as a whole; the icon carries the state. */
+.line-eye {
+  color: #4a4436;
 }
 .line-del {
   color: #b0341d;
@@ -853,4 +793,438 @@ textarea.note-input {
   display: flex;
   gap: 10px;
   padding: 12px 0 0 46px;
+}
+
+/* ─── Focus view (one card, held up close) ─────────────────────── */
+/* The board keeps panning behind a blur while a single card floats over it.
+   Layer order inside `.focus-card`, from the back: the fold's well, the pale
+   fibre, the paper face, the turned corner, its hit area, then the two controls
+   that must never be cut away by the fold. Everything is stacked explicitly
+   because the fold is written before the paper it is torn from. */
+.focus-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  padding: 22px;
+  overflow-y: auto;
+  background: rgba(20, 14, 8, 0.55);
+  backdrop-filter: blur(3px) saturate(0.85);
+  animation: focus-dim 160ms ease both;
+}
+@keyframes focus-dim {
+  from {
+    opacity: 0;
+  }
+}
+/* `margin: auto` rather than centred flex alignment: a card taller than the
+   stage then scrolls instead of having its top cut off. */
+.focus-shell {
+  position: relative;
+  margin: auto;
+  width: min(460px, 86vw);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* The shell stays square: the card and the pad each lean by --tilt about
+     their own centre, which keeps their facing edges parallel and leaves the
+     bin free to sit at the card's bottom centre whatever the angle. The flight
+     in and out is animated from useFocusFlight, not from here. */
+  will-change: transform;
+}
+/* A print is square plus its caption, so it is the height that runs out first;
+   the print's width is what has to give for the whole card to stay in view. */
+.focus-shell--print {
+  width: min(460px, 86vw, 46vh);
+}
+/* The pad and the bin belong to the reading of the card, not to the paper —
+   they arrive once it has landed. Opacity only: anything that moved the layout
+   mid-flight would invalidate the geometry the flight was measured from. */
+.focus-pad,
+.focus-delete {
+  transition: opacity 180ms ease;
+}
+.focus-shell:not(.is-open) .focus-pad,
+.focus-shell:not(.is-open) .focus-delete {
+  opacity: 0;
+}
+.focus-card {
+  position: relative;
+  /* Above the pad below it: `filter` makes the card its own stacking context,
+     so the floating URL field can only outrank the pad from out here. */
+  z-index: 2;
+  width: 100%;
+  /* The shadow lives out here: `clip-path` is applied after `filter`, so a
+     shadow on the clipped face would be cut away with the folded corner. */
+  filter: drop-shadow(0 20px 32px rgba(0, 0, 0, 0.5));
+}
+.focus-face {
+  position: relative;
+  z-index: 2;
+  transition: clip-path 180ms ease;
+}
+.focus-face--print {
+  padding: 14px 14px 0;
+  background: #fdfdf7;
+}
+/* Positioned so the hide-image button lands in the print's own corner rather
+   than the face's, which is where an unpositioned `.card-photo` would send it. */
+.focus-photo {
+  position: relative;
+}
+.focus-face--sheet {
+  padding: 26px 26px 40px;
+}
+.focus-fiber {
+  position: absolute;
+  z-index: 1;
+  inset: 0 0 -5px 0;
+  background: #fbf3e0;
+}
+.focus-caption {
+  padding: 14px 6px 18px;
+  text-align: center;
+}
+.focus-title {
+  margin: 0;
+  font-family: var(--hand);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: #23303e;
+}
+.focus-note {
+  margin: 8px 0 0;
+  font-family: var(--hand);
+  font-size: 22px;
+  line-height: 1.25;
+  color: #3a4653;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.focus-note--muted {
+  color: #c1b79c;
+}
+/* Written on straight away rather than in a panel: no box, just a ruled line
+   under the words that firms up as you reach for it. */
+.focus-input {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 4px;
+  background: transparent;
+  color: inherit;
+  text-align: inherit;
+  resize: none;
+  overflow: hidden;
+  box-shadow: inset 0 -1px 0 rgba(90, 74, 46, 0.16);
+}
+.focus-input::placeholder {
+  color: rgba(90, 74, 46, 0.35);
+}
+.focus-input:hover {
+  box-shadow: inset 0 -1px 0 rgba(90, 74, 46, 0.4);
+}
+.focus-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.focus-add-photo {
+  margin: 18px 0 0;
+  padding: 6px 13px;
+  border: 1px dashed rgba(90, 74, 46, 0.45);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.35);
+  color: #6b5c44;
+  font-family: var(--ui);
+  font-size: 13px;
+  cursor: pointer;
+}
+.focus-add-photo:hover {
+  background: #fff;
+}
+/* Inside the print, at the far corner from the fold — the two controls on this
+   card never crowd each other. */
+.focus-photo-del {
+  position: absolute;
+  z-index: 5;
+  right: 8px;
+  bottom: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 14, 8, 0.6);
+  color: #fff;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.focus-photo-del:hover {
+  background: var(--accent);
+}
+.focus-url {
+  position: absolute;
+  z-index: 6;
+  left: 10px;
+  right: 10px;
+  top: calc(100% + 10px);
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.5);
+}
+.focus-url-row {
+  display: flex;
+  gap: 8px;
+}
+.focus-url-row input {
+  flex: 1;
+  min-width: 0;
+}
+.focus-url-row input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.focus-url-error {
+  margin: 8px 2px 0;
+  font-size: 12px;
+  color: #a3301b;
+}
+
+/* The dog-eared corner: the GM's reveal control.
+   The *well* is the shadowed underside the fold uncovers — it never moves, so
+   the icon in it holds still while the corner turns. The *flap* is the corner
+   itself, mirrored across the crease: a box whose triangle spans
+   (100%-fold, 0) → (100%, fold) → (100%-fold, fold), which is where folded
+   paper actually lands. Pointing at the *hit* peels it further open, and that
+   movement is also the keyboard focus indicator — an outline would be clipped
+   away with the triangle. */
+.fold-well {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  background: linear-gradient(225deg, #4d4029, #221a12 78%);
+}
+.fold-icon {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  /* Pale, because what it lies on is the shadowed underside of the paper. */
+  color: #f0e2c4;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+.fold-flap {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  pointer-events: none;
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+  /* The crease runs down the middle of this box, so the shading has to start at
+     50% — anything earlier lands on the half that is clipped away. */
+  background:
+    linear-gradient(
+      225deg,
+      rgba(90, 74, 46, 0) 48%,
+      rgba(90, 74, 46, 0.42) 53%,
+      rgba(90, 74, 46, 0.06) 100%
+    ),
+    #f7f0de;
+  transition: width 180ms ease, height 180ms ease;
+}
+.fold-hit {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  /* Only the corner triangle is live, so it can't swallow the photo's own
+     buttons sitting just inside it. */
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+/* The notepad, unfolded: the pad that was peeking out from behind the card. */
+.focus-pad {
+  padding: 18px 20px 16px;
+  border-radius: 3px;
+  /* Leans with the card, plus a hair of its own — two loose sheets, not one. */
+  transform: rotate(calc(var(--tilt, 0) * 1deg + 0.9deg));
+  color: #33302a;
+  background-color: #fdf6b2;
+  background-image:
+    linear-gradient(90deg, transparent 40px, #f6c6c0 40px, #f6c6c0 41px, transparent 41px),
+    repeating-linear-gradient(#fdf6b2 0 27px, #cdd9e6 27px 28px);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.45);
+}
+/* The pad is pale, so the quiet button has to go dark-on-light here. */
+.focus-pad .btn--ghost {
+  background: rgba(51, 48, 42, 0.1);
+  color: #4a4436;
+}
+/* One button for one destructive action, sitting astride the seam between the
+   card and its pad. A zero-height flex row: it adds a second gap to the gutter,
+   so the button straddles the join without covering either surface's text, and
+   nothing about the layout depends on how tall the card happens to be. */
+.focus-delete {
+  position: relative;
+  z-index: 3;
+  height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.focus-delete-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #2a2118;
+  color: #f6e5c9;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5);
+  transition: background 150ms ease;
+}
+.focus-delete-btn:hover {
+  background: var(--accent);
+}
+.focus-delete.is-armed .focus-delete-btn {
+  background: var(--accent);
+}
+.focus-delete-ask {
+  position: absolute;
+  left: calc(50% + 30px);
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The rotate arrow off a card's top-left corner. On a board card it waits until
+   the card is under the pointer; on the focused card — the one card being worked
+   on — it simply stays, arriving with the pad and the bin once the card lands.
+
+   The wrapper is always hit-testable, and it is the *grip* whose pointer-events
+   are gated. That asymmetry is what makes the handle reachable at all: it sits
+   outside the card's box, so if the whole handle went `pointer-events: none`
+   while hidden, the pointer would cross ground belonging to neither the card nor
+   the handle, lose `:hover`, and the handle would become untouchable exactly as
+   you arrived at it — with no way to bring it back. Hovering the wrapper keeps
+   `.card:hover` true, since it is one of the card's own children, so the reveal
+   holds from any direction. Nothing can be rotated by accident meanwhile: while
+   the handle is hidden the wrapper is inert, and pressing it does nothing.
+   It laps 4px over the card's corner as well, so the natural diagonal approach
+   never even starts the fade. */
+.rotate-handle {
+  position: absolute;
+  z-index: 6;
+  top: -34px;
+  left: -34px;
+  width: 38px;
+  height: 38px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.card.is-editable:hover .rotate-handle,
+.rotate-handle.is-active,
+.rotate-handle:focus-within,
+.focus-shell.is-open .rotate-handle {
+  opacity: 1;
+}
+.rotate-grip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #2a2118;
+  color: #f6e5c9;
+  cursor: grab;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  touch-action: none;
+  pointer-events: none;
+}
+.card.is-editable:hover .rotate-grip,
+.rotate-handle.is-active .rotate-grip,
+.rotate-handle:focus-within .rotate-grip,
+.focus-shell.is-open .rotate-grip {
+  pointer-events: auto;
+}
+.rotate-grip:active {
+  cursor: grabbing;
+  background: var(--accent);
+}
+.rotate-grip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tilt-pill {
+  position: absolute;
+  top: 3px;
+  left: 38px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: #2a2118;
+  color: #f6e5c9;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: rotate(calc(var(--tilt, 0) * -1deg));
+  transform-origin: left center;
+}
+.focus-close {
+  position: absolute;
+  z-index: 8;
+  top: 14px;
+  right: 16px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #2a2118;
+  color: #f6e5c9;
+  font-size: 21px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+.focus-close:hover {
+  background: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-backdrop {
+    animation: none;
+  }
+  .focus-pad,
+  .focus-delete,
+  .rotate-handle,
+  .focus-face,
+  .fold-flap {
+    transition: none;
+  }
 }

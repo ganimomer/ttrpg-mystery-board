@@ -41,12 +41,20 @@ export interface TearPaths {
  * Invariant: at every sample column the fiber boundary sits *below* the face's
  * (a shallower cut = lower edge). That is what lets the pale rim show through
  * the bites instead of being hidden behind the face.
+ *
+ * `fold` (px) cuts the top-right corner off at 45°, for a dog-eared sheet. It
+ * adds one point to the top edge of both polygons, so every fold size yields
+ * the same point count and CSS can animate between two of them.
  */
-export function tearPaths(id: string): TearPaths {
+export function tearPaths(id: string, fold = 0): TearPaths {
   const rand = mulberry32(hashSeed(id));
 
-  const face: string[] = ["0% 0%", "100% 0%"];
-  const fiber: string[] = ["0% 0%", "100% 0%"];
+  const top =
+    fold > 0
+      ? ["0% 0%", `calc(100% - ${fold}px) 0%`, `100% ${fold}px`]
+      : ["0% 0%", "100% 0%"];
+  const face: string[] = [...top];
+  const fiber: string[] = [...top];
 
   for (let i = POINTS - 1; i >= 0; i--) {
     // Jitter x off the even grid so the rip doesn't read as a regular zigzag.

@@ -2,19 +2,23 @@ import { useMemo, useRef, useState } from "react";
 import type { Card, Connection } from "@board/shared";
 import { api } from "../api";
 import { Board, type BoardHandles } from "./Board";
-import { CardInspector, ConnectionInspector } from "./Inspector";
+import { CardFocus } from "./CardFocus";
+import { ConnectionInspector } from "./Inspector";
 import { CARD_HEIGHT, CARD_WIDTH } from "./layout";
 import { useBoardSync } from "./useBoardSync";
+import type { FocusFrom } from "./useFocusFlight";
 
 interface Props {
   boardId: string;
   onExit: () => void;
 }
 
-type Selection =
-  | { type: "card"; id: string }
-  | { type: "connection"; id: string }
-  | null;
+/** Cards are read and written in the focus view, so only strings are selected. */
+type Selection = { type: "connection"; id: string } | null;
+
+/** The card held up close. `from` is where it flies out of — null for a card
+ *  that isn't on screen yet, like one created a moment ago. */
+type Focus = { cardId: string; from: FocusFrom | null };
 
 export function BoardView({ boardId, onExit }: Props) {
   const state = useBoardSync(boardId);
@@ -22,7 +26,7 @@ export function BoardView({ boardId, onExit }: Props) {
   const [previewAsPlayer, setPreviewAsPlayer] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [openNotepadCardId, setOpenNotepadCardId] = useState<string | null>(null);
+  const [focus, setFocus] = useState<Focus | null>(null);
   const handles = useRef<BoardHandles | null>(null);
 
   const isGM = state.board?.role === "gm";
@@ -62,7 +66,9 @@ export function BoardView({ boardId, onExit }: Props) {
         rotation: Math.round((Math.random() - 0.5) * 12),
         revealed: false,
       });
-      setSelection({ type: "card", id: card.id });
+      // Held up straight away, so the GM can name it.
+      setSelection(null);
+      setFocus({ cardId: card.id, from: null });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Could not add card");
     } finally {
@@ -75,6 +81,14 @@ export function BoardView({ boardId, onExit }: Props) {
     if (!card) return;
     state.patchCardLocal({ ...card, x, y });
     if (commit) void api.updateCard(boardId, id, { x, y }).catch(() => {});
+  }
+
+  /** Same deal as a drag: the card turns locally, the server hears once. */
+  function tiltCard(id: string, rotation: number, commit: boolean) {
+    const card = state.cards[id];
+    if (!card) return;
+    state.patchCardLocal({ ...card, rotation });
+    if (commit) void api.updateCard(boardId, id, { rotation }).catch(() => {});
   }
 
   async function createConnection(fromCardId: string, toCardId: string) {
@@ -91,7 +105,7 @@ export function BoardView({ boardId, onExit }: Props) {
   }
 
   async function deleteCard(id: string) {
-    setSelection(null);
+    setFocus(null);
     await api.deleteCard(boardId, id).catch(() => {});
   }
   async function deleteConnection(id: string) {
@@ -118,10 +132,11 @@ export function BoardView({ boardId, onExit }: Props) {
     );
   }
 
-  const selectedCard =
-    selection?.type === "card" ? cards[selection.id] : undefined;
   const selectedConn =
     selection?.type === "connection" ? connections[selection.id] : undefined;
+  // A card can vanish under an open focus view — deleted by another GM, or
+  // un-revealed while previewing as a player.
+  const focusedCard = focus ? cards[focus.cardId] : undefined;
 
   return (
     <div className="boardview">
@@ -142,6 +157,7 @@ export function BoardView({ boardId, onExit }: Props) {
                 onChange={(e) => {
                   setPreviewAsPlayer(e.target.checked);
                   setSelection(null);
+                  setFocus(null);
                 }}
               />
               Preview as player
@@ -166,37 +182,40 @@ export function BoardView({ boardId, onExit }: Props) {
 
       <div className="board-stage">
         <Board
-          boardId={boardId}
           cards={cards}
           connections={connections}
           editable={editable}
           selectedId={selection?.id ?? null}
-          onSelectCard={(id) => editable && setSelection({ type: "card", id })}
+          focusedCardId={focus?.cardId ?? null}
+          onFocusCard={(cardId, from) => {
+            setSelection(null);
+            setFocus({ cardId, from });
+          }}
           onSelectConnection={(id) =>
             editable && setSelection({ type: "connection", id })
           }
           onClearSelection={() => setSelection(null)}
           onMoveCard={moveCard}
+          onTiltCard={tiltCard}
           onCreateConnection={createConnection}
-          openNotepadCardId={openNotepadCardId}
-          onOpenNotepad={setOpenNotepadCardId}
-          onCloseNotepad={() => setOpenNotepadCardId(null)}
           handlesRef={handles}
         />
 
-        {editable && selectedCard && (
-          <aside className="side-panel">
-            {/* Keyed so switching cards remounts the panel, which commits any
-                edit still sitting in a field. */}
-            <CardInspector
-              key={selectedCard.id}
-              boardId={boardId}
-              card={selectedCard}
-              onDelete={deleteCard}
-              onOpenNotepad={setOpenNotepadCardId}
-            />
-          </aside>
+        {focus && focusedCard && (
+          /* Keyed so a different card remounts the view, which commits any edit
+             still sitting in a field. */
+          <CardFocus
+            key={focus.cardId}
+            boardId={boardId}
+            card={focusedCard}
+            editable={editable}
+            from={focus.from}
+            onClose={() => setFocus(null)}
+            onDelete={deleteCard}
+            onTilt={(rotation, commit) => tiltCard(focus.cardId, rotation, commit)}
+          />
         )}
+
         {editable && selectedConn && (
           <aside className="side-panel">
             <ConnectionInspector

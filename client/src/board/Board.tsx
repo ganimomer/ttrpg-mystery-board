@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import type { Card as CardData, Connection } from "@board/shared";
 import { Card } from "./Card";
-import { NotepadOverlay } from "./NotepadOverlay";
 import { StringLayer } from "./StringLayer";
+import type { FocusFrom } from "./useFocusFlight";
 import { useViewport } from "./useViewport";
 
 export interface BoardHandles {
@@ -11,36 +11,32 @@ export interface BoardHandles {
 }
 
 interface Props {
-  boardId: string;
   cards: Record<string, CardData>;
   connections: Record<string, Connection>;
   editable: boolean;
   selectedId: string | null;
-  onSelectCard: (id: string) => void;
+  focusedCardId: string | null;
+  onFocusCard: (id: string, from: FocusFrom) => void;
   onSelectConnection: (id: string) => void;
   onClearSelection: () => void;
   onMoveCard: (id: string, x: number, y: number, commit: boolean) => void;
+  onTiltCard: (id: string, rotation: number, commit: boolean) => void;
   onCreateConnection: (fromCardId: string, toCardId: string) => void;
-  openNotepadCardId: string | null;
-  onOpenNotepad: (id: string) => void;
-  onCloseNotepad: () => void;
   handlesRef?: React.MutableRefObject<BoardHandles | null>;
 }
 
 export function Board({
-  boardId,
   cards,
   connections,
   editable,
   selectedId,
-  onSelectCard,
+  focusedCardId,
+  onFocusCard,
   onSelectConnection,
   onClearSelection,
   onMoveCard,
+  onTiltCard,
   onCreateConnection,
-  openNotepadCardId,
-  onOpenNotepad,
-  onCloseNotepad,
   handlesRef,
 }: Props) {
   const {
@@ -140,14 +136,14 @@ export function Board({
             key={card.id}
             card={card}
             editable={editable}
-            selected={selectedId === card.id}
+            focused={focusedCardId === card.id}
             connectArmed={pendingFrom !== null && pendingFrom !== card.id}
             zoom={vp.zoom}
-            onSelect={onSelectCard}
+            onFocus={onFocusCard}
             onDragMove={(id, x, y) => onMoveCard(id, x, y, false)}
             onDragEnd={(id, x, y) => onMoveCard(id, x, y, true)}
+            onTilt={(rotation, commit) => onTiltCard(card.id, rotation, commit)}
             onTackClick={handleTackClick}
-            onOpenNotepad={onOpenNotepad}
           />
         ))}
 
@@ -156,15 +152,6 @@ export function Board({
 
       {pendingFrom && (
         <div className="board-hint">Click another card’s tack to tie the string · Esc / click empty to cancel</div>
-      )}
-
-      {openNotepadCardId && cards[openNotepadCardId] && (
-        <NotepadOverlay
-          boardId={boardId}
-          card={cards[openNotepadCardId]}
-          editable={editable}
-          onClose={onCloseNotepad}
-        />
       )}
     </div>
   );
