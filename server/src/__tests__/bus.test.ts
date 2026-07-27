@@ -24,6 +24,8 @@ function card(revealed: boolean): Card {
     rotation: 0,
     revealed,
     notepad: [],
+    groupId: null,
+    frame: null,
   };
 }
 
@@ -124,5 +126,39 @@ describe("realtime subscriber reveal filtering", () => {
 
     offGm();
     offPlayer();
+  });
+
+  it("does not tell a player which hidden group a card belongs to", () => {
+    const gm = collector();
+    const player = collector();
+    const offGm = subscribe("board1", { role: "gm", send: gm.send });
+    const offPlayer = subscribe("board1", { role: "player", send: player.send });
+
+    const member: Card = { ...card(true), groupId: "theCult" };
+    deliverCardUpsert(member, false); // the group's own card is hidden
+
+    const gmEvent = gm.events[0];
+    const playerEvent = player.events[0];
+    if (gmEvent.type !== "card.upserted" || playerEvent.type !== "card.upserted") {
+      throw new Error("expected card.upserted events");
+    }
+    expect(gmEvent.card.groupId).toBe("theCult");
+    expect(playerEvent.card.groupId).toBeNull();
+    expect(JSON.stringify(player.events)).not.toContain("theCult");
+
+    offGm();
+    offPlayer();
+  });
+
+  it("keeps membership of a group the player can see", () => {
+    const player = collector();
+    const off = subscribe("board1", { role: "player", send: player.send });
+
+    deliverCardUpsert({ ...card(true), groupId: "theGuild" }, true);
+
+    const event = player.events[0];
+    if (event.type !== "card.upserted") throw new Error("expected card.upserted");
+    expect(event.card.groupId).toBe("theGuild");
+    off();
   });
 });

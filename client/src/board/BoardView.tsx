@@ -4,7 +4,14 @@ import { api } from "../api";
 import { Board, type BoardHandles } from "./Board";
 import { CardFocus } from "./CardFocus";
 import { ConnectionInspector } from "./Inspector";
-import { CARD_HEIGHT, CARD_WIDTH } from "./layout";
+import {
+  CARD_HEIGHT,
+  CARD_WIDTH,
+  FRAME_DEFAULT,
+  PLATE_OVERHANG,
+  groupAt,
+  membershipPoint,
+} from "./layout";
 import { useBoardSync } from "./useBoardSync";
 import type { FocusFrom } from "./useFocusFlight";
 
@@ -27,6 +34,7 @@ export function BoardView({ boardId, onExit }: Props) {
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const handles = useRef<BoardHandles | null>(null);
 
   const isGM = state.board?.role === "gm";
@@ -46,6 +54,11 @@ export function BoardView({ boardId, onExit }: Props) {
         cards[c.id] = { ...c, notepad: c.notepad.filter((t) => t.revealed) };
       }
     }
+    // …and mirror stripHiddenGroups: a card in a group the player can't see
+    // shows up loose, never hinting that the group exists.
+    for (const c of Object.values(cards)) {
+      if (c.groupId && !cards[c.groupId]) cards[c.id] = { ...c, groupId: null };
+    }
     const connections: Record<string, Connection> = {};
     for (const c of Object.values(state.connections)) {
       if (c.revealed && cards[c.fromCardId] && cards[c.toCardId]) {
@@ -55,16 +68,32 @@ export function BoardView({ boardId, onExit }: Props) {
     return { cards, connections };
   }, [previewAsPlayer, state.cards, state.connections]);
 
-  async function addCard() {
+  /** Which group a card at this position would belong to. */
+  function groupOf(at: { x: number; y: number }, exclude?: string): string | null {
+    const p = membershipPoint(at);
+    return groupAt(p.x, p.y, Object.values(state.cards), exclude);
+  }
+
+  /** Adds a card at the viewport centre — a plain one, or a group with a frame. */
+  async function addCard(frame?: { width: number; height: number }) {
     if (busy) return;
     setBusy(true);
     try {
       const center = handles.current?.viewportCenter() ?? { x: 0, y: 0 };
+      const x = Math.round(center.x - CARD_WIDTH / 2);
+      // A group hangs its frame below the nameplate, so drop the plate high
+      // enough that the frame lands in view rather than off the bottom.
+      const y = Math.round(
+        frame ? center.y - PLATE_OVERHANG - frame.height / 2 : center.y - CARD_HEIGHT / 2,
+      );
       const card = await api.createCard(boardId, {
-        x: Math.round(center.x - CARD_WIDTH / 2),
-        y: Math.round(center.y - CARD_HEIGHT / 2),
+        x,
+        y,
         rotation: Math.round((Math.random() - 0.5) * 12),
         revealed: false,
+        frame: frame ?? null,
+        // Born inside a frame? Then it starts out as a member of that group.
+        groupId: frame ? null : groupOf({ x, y }),
       });
       // Held up straight away, so the GM can name it.
       setSelection(null);
@@ -79,8 +108,46 @@ export function BoardView({ boardId, onExit }: Props) {
   function moveCard(id: string, x: number, y: number, commit: boolean) {
     const card = state.cards[id];
     if (!card) return;
-    state.patchCardLocal({ ...card, x, y });
-    if (commit) void api.updateCard(boardId, id, { x, y }).catch(() => {});
+
+    // A group travels as one object: its cards keep their places inside the
+    // frame, and their membership is not up for reconsideration.
+    if (card.frame) {
+      const dx = x - card.x;
+      const dy = y - card.y;
+      const members = Object.values(state.cards).filter((c) => c.groupId === id);
+      state.patchCardLocal({ ...card, x, y });
+      for (const m of members) {
+        state.patchCardLocal({ ...m, x: m.x + dx, y: m.y + dy });
+      }
+      if (commit) {
+        void api.updateCard(boardId, id, { x, y }).catch(() => {});
+        for (const m of members) {
+          const moved = { x: m.x + dx, y: m.y + dy };
+          void api.updateCard(boardId, m.id, moved).catch(() => {});
+        }
+      }
+      return;
+    }
+
+    const groupId = groupOf({ x, y }, id);
+    setDropTargetId(commit ? null : groupId);
+    state.patchCardLocal({ ...card, x, y, groupId });
+    if (commit) void api.updateCard(boardId, id, { x, y, groupId }).catch(() => {});
+  }
+
+  /** Hop the focus view to another card — it flies in from its place on the
+   *  board, and the card being left commits its edits as it unmounts. */
+  function navigateFocus(cardId: string) {
+    setFocus({ cardId, from: handles.current?.takeoffFor(cardId) ?? null });
+  }
+
+  function resizeFrame(id: string, width: number, height: number, commit: boolean) {
+    const card = state.cards[id];
+    if (!card?.frame) return;
+    state.patchCardLocal({ ...card, frame: { width, height } });
+    if (commit) {
+      void api.updateCard(boardId, id, { frame: { width, height } }).catch(() => {});
+    }
   }
 
   /** Same deal as a drag: the card turns locally, the server hears once. */
@@ -137,6 +204,17 @@ export function BoardView({ boardId, onExit }: Props) {
   // A card can vanish under an open focus view — deleted by another GM, or
   // un-revealed while previewing as a player.
   const focusedCard = focus ? cards[focus.cardId] : undefined;
+  // What the focused card belongs to, and what belongs to it. Both come from the
+  // already player-filtered map, so a player only ever sees permitted cards.
+  const focusedGroup = focusedCard?.groupId
+    ? (cards[focusedCard.groupId] ?? null)
+    : null;
+  const focusedMembers = focusedCard?.frame
+    ? Object.values(cards)
+        .filter((c) => c.groupId === focusedCard.id)
+        // Reading order inside the frame, so the row matches the board.
+        .sort((a, b) => a.y - b.y || a.x - b.x)
+    : [];
 
   return (
     <div className="boardview">
@@ -146,8 +224,20 @@ export function BoardView({ boardId, onExit }: Props) {
         <div className="spacer" />
         {isGM && (
           <>
-            <button className="btn" onClick={addCard} disabled={busy || previewAsPlayer}>
+            <button
+              className="btn"
+              onClick={() => void addCard()}
+              disabled={busy || previewAsPlayer}
+            >
               + Card
+            </button>
+            <button
+              className="btn"
+              onClick={() => void addCard(FRAME_DEFAULT)}
+              disabled={busy || previewAsPlayer}
+              title="A dotted frame with a card at its top; drag cards inside to group them"
+            >
+              + Group
             </button>
             <button className="btn" onClick={makeInvite}>Invite players</button>
             <label className="preview-switch">
@@ -197,6 +287,8 @@ export function BoardView({ boardId, onExit }: Props) {
           onClearSelection={() => setSelection(null)}
           onMoveCard={moveCard}
           onTiltCard={tiltCard}
+          onResizeFrame={resizeFrame}
+          dropTargetId={dropTargetId}
           onCreateConnection={createConnection}
           handlesRef={handles}
         />
@@ -210,9 +302,12 @@ export function BoardView({ boardId, onExit }: Props) {
             card={focusedCard}
             editable={editable}
             from={focus.from}
+            group={focusedGroup}
+            members={focusedMembers}
             onClose={() => setFocus(null)}
             onDelete={deleteCard}
             onTilt={(rotation, commit) => tiltCard(focus.cardId, rotation, commit)}
+            onNavigate={navigateFocus}
           />
         )}
 

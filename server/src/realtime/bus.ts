@@ -57,8 +57,14 @@ async function handle(p: Pointer): Promise<void> {
   switch (p.t) {
     case "card": {
       const card = await loadCardWithNotepad(p.id);
-      if (card) deliverCardUpsert(card);
-      else deliverCardRemove(p.boardId, p.id); // deleted meanwhile
+      if (!card) {
+        deliverCardRemove(p.boardId, p.id); // deleted meanwhile
+        break;
+      }
+      // Whether a player may be told this card is in a group depends on the
+      // group's card, which only the database knows about here.
+      const group = card.groupId ? await loadCardWithNotepad(card.groupId) : null;
+      deliverCardUpsert(card, !card.groupId || !!group?.revealed);
       break;
     }
     case "card_rm":

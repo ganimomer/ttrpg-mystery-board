@@ -21,6 +21,12 @@ export function toCard(row: CardRow, notepad: Tidbit[] = []): Card {
     rotation: row.rotation,
     revealed: row.revealed,
     notepad,
+    groupId: row.groupId,
+    // Two columns, one concept: a size means this card heads a group.
+    frame:
+      row.frameWidth !== null && row.frameHeight !== null
+        ? { width: row.frameWidth, height: row.frameHeight }
+        : null,
   };
 }
 

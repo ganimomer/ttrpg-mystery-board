@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Card, Connection } from "@board/shared";
-import { visibleCards, visibleConnections } from "../reveal.js";
+import { stripHiddenGroups, visibleCards, visibleConnections } from "../reveal.js";
 
-function card(id: string, revealed: boolean): Card {
+function card(id: string, revealed: boolean, extra: Partial<Card> = {}): Card {
   return {
     id,
     boardId: "b",
@@ -14,6 +14,9 @@ function card(id: string, revealed: boolean): Card {
     rotation: 0,
     revealed,
     notepad: [],
+    groupId: null,
+    frame: null,
+    ...extra,
   };
 }
 
@@ -45,6 +48,34 @@ describe("visibleCards", () => {
     const seen = visibleCards(cards, "player");
     expect(seen.map((c) => c.id).sort()).toEqual(["a", "c"]);
     expect(seen.some((c) => !c.revealed)).toBe(false);
+  });
+});
+
+describe("stripHiddenGroups", () => {
+  const frame = { width: 400, height: 300 };
+  // A revealed group holding a revealed card, and a hidden group holding one.
+  const cards = [
+    card("openGroup", true, { frame }),
+    card("inOpen", true, { groupId: "openGroup" }),
+    card("secretGroup", false, { frame }),
+    card("inSecret", true, { groupId: "secretGroup" }),
+  ];
+
+  it("leaves the GM's membership alone", () => {
+    expect(stripHiddenGroups(cards, "gm")).toEqual(cards);
+  });
+
+  it("keeps membership of a group the player can see", () => {
+    const seen = stripHiddenGroups(visibleCards(cards, "player"), "player");
+    expect(seen.find((c) => c.id === "inOpen")?.groupId).toBe("openGroup");
+  });
+
+  it("never tells a player about a group whose card is hidden", () => {
+    const seen = stripHiddenGroups(visibleCards(cards, "player"), "player");
+    // The hidden group's own card is gone, and the card inside it arrives loose.
+    expect(seen.map((c) => c.id).sort()).toEqual(["inOpen", "inSecret", "openGroup"]);
+    expect(seen.find((c) => c.id === "inSecret")?.groupId).toBeNull();
+    expect(JSON.stringify(seen)).not.toContain("secretGroup");
   });
 });
 

@@ -27,6 +27,13 @@ export interface Tidbit {
   revealed: boolean;
 }
 
+/** The dotted rectangle a group's card heads. Its position is derived from the
+ *  card's, so only the size is stored. */
+export interface Frame {
+  width: number;
+  height: number;
+}
+
 /** A card pinned to the board. */
 export interface Card {
   id: string;
@@ -41,6 +48,12 @@ export interface Card {
   // Lined-notepaper tidbits tucked under the card. Ordered; the server
   // returns this already role-filtered (players get only revealed tidbits).
   notepad: Tidbit[];
+  /** The group card this one sits inside, if any. Players never receive it for
+   *  a group whose own card is hidden from them. */
+  groupId: string | null;
+  /** Non-null means this card *is* a group: it wears the nameplate at the top of
+   *  a frame drawn around its members. */
+  frame: Frame | null;
 }
 
 /** A string tied between two cards, denoting a relationship. */
@@ -75,10 +88,23 @@ export interface CreateCardInput {
   y: number;
   rotation?: number;
   revealed?: boolean;
+  groupId?: string | null;
+  frame?: Frame | null;
 }
 
 export type UpdateCardInput = Partial<
-  Pick<Card, "title" | "note" | "imageUrl" | "x" | "y" | "rotation" | "revealed">
+  Pick<
+    Card,
+    | "title"
+    | "note"
+    | "imageUrl"
+    | "x"
+    | "y"
+    | "rotation"
+    | "revealed"
+    | "groupId"
+    | "frame"
+  >
 >;
 
 export interface CreateConnectionInput {

@@ -37,6 +37,17 @@ const imageUrlField = z
   .nullable()
   .optional();
 
+/** A group's frame. Big enough to hold cards, small enough to stay on a board. */
+const frameField = z
+  .object({
+    width: z.number().int().min(240).max(6000),
+    height: z.number().int().min(200).max(6000),
+  })
+  .nullable()
+  .optional();
+
+const groupIdField = z.string().max(40).nullable().optional();
+
 const createSchema = z.object({
   title: z.string().max(200).optional(),
   note: z.string().max(2000).optional(),
@@ -45,6 +56,8 @@ const createSchema = z.object({
   y: z.number(),
   rotation: z.number().min(-45).max(45).optional(),
   revealed: z.boolean().optional(),
+  groupId: groupIdField,
+  frame: frameField,
 });
 
 const updateSchema = z.object({
@@ -55,7 +68,35 @@ const updateSchema = z.object({
   y: z.number().optional(),
   rotation: z.number().min(-45).max(45).optional(),
   revealed: z.boolean().optional(),
+  groupId: groupIdField,
+  frame: frameField,
 });
+
+/**
+ * A card may only join a group on its own board, headed by a card that actually
+ * carries a frame — and never itself. Cheap to check, and it keeps nonsense
+ * (a card grouped into another board's card, or into itself) out of the table.
+ */
+async function groupIsUsable(
+  boardId: string,
+  cardId: string,
+  groupId: string,
+): Promise<boolean> {
+  if (groupId === cardId) return false;
+  const [row] = await db
+    .select({ frameWidth: schema.cards.frameWidth })
+    .from(schema.cards)
+    .where(and(eq(schema.cards.id, groupId), eq(schema.cards.boardId, boardId)))
+    .limit(1);
+  return !!row && row.frameWidth !== null;
+}
+
+/** The columns a frame lives in — one concept, two nullable integers. */
+function frameColumns(frame: { width: number; height: number } | null) {
+  return frame
+    ? { frameWidth: frame.width, frameHeight: frame.height }
+    : { frameWidth: null, frameHeight: null };
+}
 
 cardsRoutes.post("/", requireBoardGM, async (c) => {
   const boardId = c.get("boardId");
@@ -65,6 +106,8 @@ cardsRoutes.post("/", requireBoardGM, async (c) => {
   const d = parsed.data;
 
   const id = nanoid();
+  const groupId =
+    d.groupId && (await groupIsUsable(boardId, id, d.groupId)) ? d.groupId : null;
   await db.insert(schema.cards).values({
     id,
     boardId,
@@ -75,6 +118,8 @@ cardsRoutes.post("/", requireBoardGM, async (c) => {
     y: Math.round(d.y),
     rotation: Math.round(d.rotation ?? 0),
     revealed: d.revealed ?? false,
+    groupId,
+    ...frameColumns(d.frame ?? null),
   });
 
   const card = (await loadCardWithNotepad(id))!;
@@ -97,6 +142,10 @@ cardsRoutes.patch("/:cardId", requireBoardGM, async (c) => {
   if (!parsed.success) return c.json({ error: "Invalid update" }, 400);
   const d = parsed.data;
 
+  if (d.groupId && !(await groupIsUsable(boardId, cardId, d.groupId))) {
+    return c.json({ error: "No such group on this board" }, 400);
+  }
+
   await db
     .update(schema.cards)
     .set({
@@ -107,6 +156,8 @@ cardsRoutes.patch("/:cardId", requireBoardGM, async (c) => {
       ...(d.y !== undefined && { y: Math.round(d.y) }),
       ...(d.rotation !== undefined && { rotation: Math.round(d.rotation) }),
       ...(d.revealed !== undefined && { revealed: d.revealed }),
+      ...(d.groupId !== undefined && { groupId: d.groupId }),
+      ...(d.frame !== undefined && frameColumns(d.frame)),
     })
     .where(eq(schema.cards.id, cardId));
 
@@ -135,8 +186,21 @@ cardsRoutes.delete("/:cardId", requireBoardGM, async (c) => {
         eq(schema.connections.toCardId, cardId),
       ),
     );
+  // Deleting a group's card releases its members. The FK would do it silently
+  // (ON DELETE SET NULL), so do it here instead and publish each released card —
+  // otherwise other browsers keep showing them as grouped until a reload.
+  const members = await db
+    .update(schema.cards)
+    .set({ groupId: null })
+    .where(eq(schema.cards.groupId, cardId))
+    .returning({ id: schema.cards.id });
+
   await db.delete(schema.cards).where(eq(schema.cards.id, cardId));
   await publishCardRemove(boardId, cardId);
   for (const conn of conns) await publishConnectionRemove(boardId, conn.id);
+  for (const member of members) {
+    const card = await loadCardWithNotepad(member.id);
+    if (card) await publishCardUpsert(card);
+  }
   return c.json({ ok: true });
 });

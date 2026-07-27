@@ -61,6 +61,14 @@ export async function bootstrapSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS cards_board_idx ON cards(board_id);
     -- Upgrade path from the pre-URL schema (harmless if the column exists).
     ALTER TABLE cards ADD COLUMN IF NOT EXISTS image_url TEXT;
+    -- Groups. A card carrying a frame size *is* a group; group_id is the card
+    -- heading the group this one belongs to. SET NULL, so deleting a group's
+    -- card releases its members instead of deleting them.
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS group_id TEXT
+      REFERENCES cards(id) ON DELETE SET NULL;
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS frame_width INTEGER;
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS frame_height INTEGER;
+    CREATE INDEX IF NOT EXISTS cards_group_idx ON cards(group_id);
 
     CREATE TABLE IF NOT EXISTS connections (
       id TEXT PRIMARY KEY,

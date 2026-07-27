@@ -24,6 +24,21 @@ export function visibleConnections(
   );
 }
 
+/**
+ * A group is just a card, so a hidden group's frame is withheld by `visibleCards`
+ * like anything else. This closes the other half: a player who can see a card
+ * inside that group must not learn the group exists, so its `groupId` is cleared
+ * unless the group's own card is visible to them too. Call with the cards a
+ * player is actually getting.
+ */
+export function stripHiddenGroups(cards: Card[], role: Role): Card[] {
+  if (role === "gm") return cards;
+  const visible = new Set(cards.map((c) => c.id));
+  return cards.map((c) =>
+    c.groupId && !visible.has(c.groupId) ? { ...c, groupId: null } : c,
+  );
+}
+
 /** GM sees every tidbit; a player sees only revealed ones, in order. */
 export function visibleTidbits(tidbits: Tidbit[], role: Role): Tidbit[] {
   if (role === "gm") return tidbits;

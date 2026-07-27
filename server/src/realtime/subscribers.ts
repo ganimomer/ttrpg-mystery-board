@@ -41,12 +41,20 @@ function fanout(boardId: string, forRole: (sub: Subscriber) => BoardEvent | null
  * real state; a player receives the card (notepad stripped of un-revealed
  * tidbits) only while it is revealed, otherwise a `removed` event so a
  * now-hidden card disappears from their board.
+ *
+ * `groupVisible` is the caller's answer to "is this card's group revealed?" — a
+ * player is never told which group a card belongs to unless they can see the
+ * group's own card, the same rule `stripHiddenGroups` applies to the snapshot.
  */
-export function deliverCardUpsert(card: Card): void {
+export function deliverCardUpsert(card: Card, groupVisible = true): void {
   fanout(card.boardId, (sub) => {
     if (sub.role === "gm") return { type: "card.upserted", card };
     if (card.revealed) {
-      return { type: "card.upserted", card: shapeCardForRole(card, "player") };
+      const shaped = shapeCardForRole(card, "player");
+      return {
+        type: "card.upserted",
+        card: groupVisible ? shaped : { ...shaped, groupId: null },
+      };
     }
     return { type: "card.removed", cardId: card.id };
   });

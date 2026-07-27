@@ -336,6 +336,78 @@ textarea {
   pointer-events: none;
 }
 
+/* ─── Groups ───────────────────────────────────────────────────── */
+/* A group is a card wearing a nameplate at the top of this dotted rectangle;
+   the cards sitting inside it belong to it. It is drawn behind everything and
+   lets the pointer through — the cork inside a group has to stay draggable, and
+   the cards on top of it must catch their own clicks. */
+.group-frame {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border: 3px dotted rgba(48, 34, 16, 0.62);
+  border-radius: 10px;
+  background: rgba(255, 246, 226, 0.07);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.12);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+/* The card being dragged is about to join this group. */
+.group-frame.is-target {
+  border-color: #2d9c5a;
+  background: rgba(45, 156, 90, 0.09);
+}
+.group-frame.is-resizing {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+/* GM-only: a group the players cannot see yet, dimmed like its own card. */
+.group-frame.is-hidden {
+  opacity: 0.5;
+}
+/* Sits inside the frame's corner, so unlike the rotate handle it needs no
+   bridge to be reachable. */
+.frame-resize {
+  position: absolute;
+  right: -9px;
+  bottom: -9px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  pointer-events: auto;
+  cursor: nwse-resize;
+  touch-action: none;
+  background:
+    linear-gradient(
+      135deg,
+      transparent 45%,
+      rgba(58, 43, 22, 0.75) 45%,
+      rgba(58, 43, 22, 0.75) 60%,
+      transparent 60%,
+      transparent 72%,
+      rgba(58, 43, 22, 0.75) 72%,
+      rgba(58, 43, 22, 0.75) 87%,
+      transparent 87%
+    );
+}
+.frame-resize:hover,
+.frame-resize:focus-visible {
+  outline: none;
+  background:
+    linear-gradient(
+      135deg,
+      transparent 45%,
+      var(--accent) 45%,
+      var(--accent) 60%,
+      transparent 60%,
+      transparent 72%,
+      var(--accent) 72%,
+      var(--accent) 87%,
+      transparent 87%
+    );
+}
+
 /* ─── Card ─────────────────────────────────────────────────────── */
 /* `.card` is a transparent positioned/rotated container; `.card-inner`
    is the white card, painted above the notepad peek that hides behind it.
@@ -841,11 +913,17 @@ textarea {
    they arrive once it has landed. Opacity only: anything that moved the layout
    mid-flight would invalidate the geometry the flight was measured from. */
 .focus-pad,
-.focus-delete {
+.focus-delete,
+.focus-plate,
+.focus-members,
+.focus-members-empty {
   transition: opacity 180ms ease;
 }
 .focus-shell:not(.is-open) .focus-pad,
-.focus-shell:not(.is-open) .focus-delete {
+.focus-shell:not(.is-open) .focus-delete,
+.focus-shell:not(.is-open) .focus-plate,
+.focus-shell:not(.is-open) .focus-members,
+.focus-shell:not(.is-open) .focus-members-empty {
   opacity: 0;
 }
 .focus-card {
@@ -1054,6 +1132,114 @@ textarea {
   clip-path: polygon(0 0, 100% 0, 100% 100%);
 }
 
+/* ─── Mini cards ───────────────────────────────────────────────── */
+/* A card drawn small is the card itself under a transform, so it keeps its own
+   stock, tear and handwriting. The box is fixed so rows of them line up; a sheet
+   taller than the box fades off the bottom rather than being cut. */
+.mini-card {
+  position: relative;
+  flex: none;
+  /* Matches MINI_WIDTH; the height is the polaroid's 280 at the same scale. */
+  width: 104px;
+  height: 132px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+  border-radius: 3px;
+  transition: transform 0.12s ease, filter 0.12s ease;
+  mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
+}
+.mini-card:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.06);
+}
+.mini-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mini-card.is-hidden {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+}
+/* The card at full size; only the transform makes it small, so nothing about
+   the paper has to know it is being shrunk. */
+.mini-card-paper {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+/* The group a focused card belongs to, standing over it on a dotted rule that
+   echoes the frame the group draws on the board. */
+.focus-plate {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 10px;
+  border-bottom: 2px dotted rgba(246, 229, 201, 0.4);
+}
+
+/* What is inside a focused group. */
+.focus-members {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.focus-members-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Always as wide as five minis, so the row holds still as the pages turn — it
+   ends up wider than the card above it, which reads as a tray under a shelf.
+   Only a narrow window makes it scroll. */
+.focus-members-strip {
+  display: flex;
+  gap: 8px;
+  width: calc(5 * 104px + 4 * 8px);
+  max-width: calc(100vw - 120px);
+  overflow-x: auto;
+  justify-content: center;
+}
+.member-arrow {
+  flex: none;
+  width: 30px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(20, 14, 8, 0.55);
+  color: #f6e5c9;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.member-arrow:hover:not(:disabled) {
+  background: var(--accent);
+}
+.member-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.focus-members-count,
+.focus-members-empty {
+  margin: 0;
+  color: #e8dbbe;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+.focus-members-empty {
+  text-align: center;
+  font-family: var(--hand);
+  font-size: 17px;
+  opacity: 0.75;
+}
+
 /* The notepad, unfolded: the pad that was peeking out from behind the card. */
 .focus-pad {
   padding: 18px 20px 16px;
@@ -1222,6 +1408,9 @@ textarea {
   }
   .focus-pad,
   .focus-delete,
+  .focus-plate,
+  .focus-members,
+  .mini-card,
   .rotate-handle,
   .focus-face,
   .fold-flap {

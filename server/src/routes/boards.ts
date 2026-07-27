@@ -7,7 +7,12 @@ import { getMembership, requireBoardGM, requireBoardMember } from "../access.js"
 import { config } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { toCard, toConnection, toTidbit } from "../mappers.js";
-import { shapeCardForRole, visibleCards, visibleConnections } from "../reveal.js";
+import {
+  shapeCardForRole,
+  stripHiddenGroups,
+  visibleCards,
+  visibleConnections,
+} from "../reveal.js";
 import { publishBoardRenamed } from "../realtime/bus.js";
 import { requireAuth } from "../auth/session.js";
 import type { AppEnv } from "../types.js";
@@ -95,9 +100,11 @@ boardsRoutes.get("/:boardId", requireBoardMember, async (c) => {
   const allConnections = connRows.map(toConnection);
 
   // Players never receive hidden items — enforced here, server-side. Cards are
-  // additionally shaped so un-revealed tidbit text is stripped from the notepad.
-  const cards = visibleCards(allCards, role).map((c) =>
-    shapeCardForRole(c, role),
+  // additionally shaped so un-revealed tidbit text is stripped from the notepad,
+  // and membership of a group they cannot see is stripped with it.
+  const cards = stripHiddenGroups(
+    visibleCards(allCards, role).map((c) => shapeCardForRole(c, role)),
+    role,
   );
   const visibleIds = new Set(cards.map((c) => c.id));
   const connections = visibleConnections(allConnections, visibleIds, role);

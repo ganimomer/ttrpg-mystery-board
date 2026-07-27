@@ -68,9 +68,15 @@ export const cards = pgTable(
     y: integer("y").notNull().default(0),
     rotation: integer("rotation").notNull().default(0),
     revealed: boolean("revealed").notNull().default(false),
+    // Groups: a card with a frame *is* a group, and `group_id` is the card that
+    // heads the group this one sits in. Deleting a group's card releases its
+    // members rather than taking them with it (SET NULL, in bootstrapSchema).
+    groupId: text("group_id"),
+    frameWidth: integer("frame_width"),
+    frameHeight: integer("frame_height"),
     createdAt: createdAt(),
   },
-  (t) => [index("cards_board_idx").on(t.boardId)],
+  (t) => [index("cards_board_idx").on(t.boardId), index("cards_group_idx").on(t.groupId)],
 );
 
 export const connections = pgTable(

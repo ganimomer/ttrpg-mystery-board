@@ -1,8 +1,8 @@
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 import type { Card as CardData } from "@board/shared";
+import { CardFace } from "./CardFace";
 import { CARD_HEIGHT, CARD_WIDTH } from "./layout";
 import { RotateHandle } from "./RotateHandle";
-import { tearPaths } from "./tear";
 import { Thumbtack } from "./Thumbtack";
 import type { FocusFrom } from "./useFocusFlight";
 
@@ -90,11 +90,9 @@ export function Card({
 
   const hasNotepad = card.notepad.length > 0;
   // The photo decides the prop: with one the card is a pinned polaroid, without
-  // one it is a sheet of paper torn from a notebook.
+  // one it is a sheet of paper torn from a notebook. CardFace draws whichever it
+  // is; everything here is about where the card sits and how it is handled.
   const imageUrl = card.imageUrl;
-
-  // Deterministic per card, so the rip never shifts under a re-render.
-  const tear = useMemo(() => tearPaths(card.id), [card.id]);
 
   const tack = (
     <button
@@ -114,6 +112,7 @@ export function Card({
   return (
     <div
       ref={root}
+      data-card-id={card.id}
       className={[
         "card",
         imageUrl ? "" : "is-note",
@@ -153,64 +152,7 @@ export function Card({
         </div>
       )}
 
-      {imageUrl ? (
-        <div className="card-inner">
-          {tack}
-          <div className="card-photo">
-            <img
-              src={imageUrl}
-              alt={card.title}
-              draggable={false}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          </div>
-          <div className="card-caption">
-            {card.title && <div className="card-title">{card.title}</div>}
-            {card.note && <div className="card-note">{card.note}</div>}
-            {!card.title && !card.note && (
-              <div className="card-note card-note--muted">…</div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* The tack sits outside the sheet: it overhangs the top edge, where
-              the face's clip-path would slice it, and it must stay clear of the
-              wrapper's shadow and selection ring. */}
-          {tack}
-          <div
-            className="card-sheet"
-            style={
-              {
-                "--tear-face": tear.face,
-                "--tear-fiber": tear.fiber,
-              } as React.CSSProperties
-            }
-          >
-            <div className="card-sheet-face">
-              {card.title && <h3 className="card-sheet-title">{card.title}</h3>}
-              {card.note && <p className="card-sheet-body">{card.note}</p>}
-              {!card.title && !card.note && !hasNotepad && (
-                <p className="card-sheet-body card-sheet-body--muted">…</p>
-              )}
-              {hasNotepad && (
-                <div className="card-sheet-tidbits">
-                  {card.notepad.map((t) => (
-                    <span
-                      key={t.id}
-                      className={`card-sheet-tidbit ${t.revealed ? "" : "is-hidden"}`}
-                    >
-                      {t.text}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+      <CardFace card={card} tack={tack} />
     </div>
   );
 }

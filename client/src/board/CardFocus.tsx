@@ -3,6 +3,7 @@ import type { Card } from "@board/shared";
 import { api } from "../api";
 import { FoldCorner, foldSize } from "./FoldCorner";
 import { DeleteIcon, HideImageIcon } from "./icons";
+import { MiniCard } from "./MiniCard";
 import { RotateHandle } from "./RotateHandle";
 import { TidbitLines } from "./TidbitLines";
 import { tearPaths } from "./tear";
@@ -16,9 +17,15 @@ interface Props {
   /** Where on the board this card was clicked; null when there is no board
    *  self to fly from, e.g. a card created a moment ago. */
   from: FocusFrom | null;
+  /** The group this card sits in, if any — shown small above the card. */
+  group: Card | null;
+  /** The cards in this group, if this card is one — shown small underneath. */
+  members: Card[];
   onClose: () => void;
   onDelete: (id: string) => void;
   onTilt: (rotation: number, commit: boolean) => void;
+  /** Move the focus to another card, without going back to the board. */
+  onNavigate: (id: string) => void;
 }
 
 /**
@@ -31,15 +38,19 @@ export function CardFocus({
   card,
   editable,
   from,
+  group,
+  members,
   onClose,
   onDelete,
   onTilt,
+  onNavigate,
 }: Props) {
   const { shellRef, cardRef, open, requestClose } = useFocusFlight(from, onClose);
 
   const [foldOpen, setFoldOpen] = useState(false);
   const [urlOpen, setUrlOpen] = useState(false);
   const [armed, setArmed] = useState(false); // delete asks before it fires
+  const [page, setPage] = useState(0); // which five members are on show
   const titleRef = useRef<HTMLInputElement>(null);
 
   const save = (patch: Parameters<typeof api.updateCard>[2]) =>
@@ -133,6 +144,14 @@ export function CardFocus({
         aria-modal="true"
         aria-label={card.title || "Card"}
       >
+        {/* What this card belongs to, small, sitting over it on a dotted rule
+            that echoes the group's frame out on the board. */}
+        {group && (
+          <div className="focus-plate">
+            <MiniCard card={group} onOpen={onNavigate} />
+          </div>
+        )}
+
         <div
           ref={cardRef}
           className={`focus-card ${hasPhoto ? "focus-card--print" : "focus-card--sheet"}`}
@@ -228,7 +247,89 @@ export function CardFocus({
         {(editable || card.notepad.length > 0) && (
           <TidbitLines boardId={boardId} card={card} editable={editable} />
         )}
+
+        {card.frame && (
+          <MemberRow
+            members={members}
+            editable={editable}
+            page={page}
+            onPage={setPage}
+            onOpen={onNavigate}
+          />
+        )}
       </div>
+    </div>
+  );
+}
+
+const PER_PAGE = 5;
+
+/**
+ * What is in this group, small, in the order the cards read inside its frame.
+ * Five at a time — past that, an arrow each side turns the page.
+ */
+function MemberRow({
+  members,
+  editable,
+  page,
+  onPage,
+  onOpen,
+}: {
+  members: Card[];
+  editable: boolean;
+  page: number;
+  onPage: (page: number) => void;
+  onOpen: (id: string) => void;
+}) {
+  if (members.length === 0) {
+    return editable ? (
+      <p className="focus-members-empty">
+        Drag cards inside the frame to gather them here.
+      </p>
+    ) : null;
+  }
+
+  const pages = Math.ceil(members.length / PER_PAGE);
+  const current = Math.min(page, pages - 1);
+  const first = current * PER_PAGE;
+  const shown = members.slice(first, first + PER_PAGE);
+
+  return (
+    <div className="focus-members">
+      <div className="focus-members-row">
+        {pages > 1 && (
+          <button
+            type="button"
+            className="member-arrow"
+            aria-label="Previous cards"
+            disabled={current === 0}
+            onClick={() => onPage(current - 1)}
+          >
+            ‹
+          </button>
+        )}
+        <div className="focus-members-strip">
+          {shown.map((m) => (
+            <MiniCard key={m.id} card={m} onOpen={onOpen} />
+          ))}
+        </div>
+        {pages > 1 && (
+          <button
+            type="button"
+            className="member-arrow"
+            aria-label="More cards"
+            disabled={current >= pages - 1}
+            onClick={() => onPage(current + 1)}
+          >
+            ›
+          </button>
+        )}
+      </div>
+      {pages > 1 && (
+        <p className="focus-members-count">
+          {first + 1}–{first + shown.length} of {members.length}
+        </p>
+      )}
     </div>
   );
 }

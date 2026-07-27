@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { Card as CardData, Connection } from "@board/shared";
 import { Card } from "./Card";
+import { GroupFrame, groupCards } from "./GroupFrame";
 import { StringLayer } from "./StringLayer";
 import type { FocusFrom } from "./useFocusFlight";
 import { useViewport } from "./useViewport";
@@ -8,6 +9,9 @@ import { useViewport } from "./useViewport";
 export interface BoardHandles {
   /** Board coordinates at the current viewport center (for placing cards). */
   viewportCenter: () => { x: number; y: number };
+  /** Where a card sits on screen right now, for the focus view to fly out of.
+   *  Null when it isn't on the board — the focus view then pops in instead. */
+  takeoffFor: (cardId: string) => FocusFrom | null;
 }
 
 interface Props {
@@ -21,6 +25,9 @@ interface Props {
   onClearSelection: () => void;
   onMoveCard: (id: string, x: number, y: number, commit: boolean) => void;
   onTiltCard: (id: string, rotation: number, commit: boolean) => void;
+  onResizeFrame: (id: string, width: number, height: number, commit: boolean) => void;
+  /** The group a dragged card is about to join, so its frame can light up. */
+  dropTargetId: string | null;
   onCreateConnection: (fromCardId: string, toCardId: string) => void;
   handlesRef?: React.MutableRefObject<BoardHandles | null>;
 }
@@ -36,6 +43,8 @@ export function Board({
   onClearSelection,
   onMoveCard,
   onTiltCard,
+  onResizeFrame,
+  dropTargetId,
   onCreateConnection,
   handlesRef,
 }: Props) {
@@ -62,6 +71,20 @@ export function Board({
           rect.top + rect.height / 2,
           rect,
         );
+      },
+      takeoffFor: (cardId) => {
+        const el = containerRef.current?.querySelector(
+          `[data-card-id="${cardId}"]`,
+        );
+        if (!el) return null;
+        // The centre of a rotated box's bounding box is still its centre, which
+        // is why a tilted card can report an exact take-off point.
+        const r = el.getBoundingClientRect();
+        return {
+          cx: r.left + r.width / 2,
+          cy: r.top + r.height / 2,
+          scale: vp.zoom,
+        };
       },
     };
   }
@@ -129,6 +152,18 @@ export function Board({
           transform: `translate(${vp.panX}px, ${vp.panY}px) scale(${vp.zoom})`,
         }}
       >
+        {/* Frames first: they belong behind every card and every string. */}
+        {groupCards(Object.values(cards)).map((card) => (
+          <GroupFrame
+            key={`frame-${card.id}`}
+            card={card}
+            editable={editable}
+            targeted={dropTargetId === card.id}
+            zoom={vp.zoom}
+            onResize={(w, h, commit) => onResizeFrame(card.id, w, h, commit)}
+          />
+        ))}
+
         <StringLayer {...stringProps} layer="hit" />
 
         {Object.values(cards).map((card) => (
