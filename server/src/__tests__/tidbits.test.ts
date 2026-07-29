@@ -29,6 +29,7 @@ describe("shapeCardForRole", () => {
     title: "NPC",
     note: "",
     imageUrl: null,
+    entityType: null,
     groupId: null,
     frame: null,
     x: 0,

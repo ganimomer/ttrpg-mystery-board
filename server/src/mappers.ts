@@ -20,6 +20,7 @@ export function toCard(row: CardRow, notepad: Tidbit[] = []): Card {
     y: row.y,
     rotation: row.rotation,
     revealed: row.revealed,
+    entityType: row.entityType,
     notepad,
     groupId: row.groupId,
     // Two columns, one concept: a size means this card heads a group.

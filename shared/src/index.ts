@@ -34,6 +34,13 @@ export interface Frame {
   height: number;
 }
 
+/**
+ * What a card is: a suspect, an object, somewhere it happened. `group` is not one
+ * of these — a card that carries a frame *is* a group, so that kind is read off
+ * the frame rather than stored, and can never disagree with it.
+ */
+export type EntityType = "person" | "thing" | "place";
+
 /** A card pinned to the board. */
 export interface Card {
   id: string;
@@ -45,6 +52,9 @@ export interface Card {
   y: number;
   rotation: number; // degrees
   revealed: boolean;
+  /** Null until the GM says what this card is; an untyped card wears no icon
+   *  and keeps its plain stock. */
+  entityType: EntityType | null;
   // Lined-notepaper tidbits tucked under the card. Ordered; the server
   // returns this already role-filtered (players get only revealed tidbits).
   notepad: Tidbit[];
@@ -115,6 +125,7 @@ export interface CreateCardInput {
   y: number;
   rotation?: number;
   revealed?: boolean;
+  entityType?: EntityType | null;
   groupId?: string | null;
   frame?: Frame | null;
 }
@@ -129,6 +140,7 @@ export type UpdateCardInput = Partial<
     | "y"
     | "rotation"
     | "revealed"
+    | "entityType"
     | "groupId"
     | "frame"
   >

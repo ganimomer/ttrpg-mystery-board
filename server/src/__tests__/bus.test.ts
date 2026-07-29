@@ -23,6 +23,7 @@ function card(revealed: boolean): Card {
     y: 0,
     rotation: 0,
     revealed,
+    entityType: null,
     notepad: [],
     groupId: null,
     frame: null,

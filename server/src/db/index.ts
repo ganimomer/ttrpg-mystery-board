@@ -61,6 +61,9 @@ export async function bootstrapSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS cards_board_idx ON cards(board_id);
     -- Upgrade path from the pre-URL schema (harmless if the column exists).
     ALTER TABLE cards ADD COLUMN IF NOT EXISTS image_url TEXT;
+    -- What the card is: person / thing / place, or NULL until the GM says. Left
+    -- unconstrained; the API's enum is what keeps the values honest.
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS entity_type TEXT;
     -- Groups. A card carrying a frame size *is* a group; group_id is the card
     -- heading the group this one belongs to. SET NULL, so deleting a group's
     -- card releases its members instead of deleting them.

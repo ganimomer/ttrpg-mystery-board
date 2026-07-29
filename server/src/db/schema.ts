@@ -70,6 +70,9 @@ export const cards = pgTable(
     y: integer("y").notNull().default(0),
     rotation: integer("rotation").notNull().default(0),
     revealed: boolean("revealed").notNull().default(false),
+    // What the card is. Null means the GM has not said yet. `group` is absent on
+    // purpose: a card with a frame is a group, so storing it too could disagree.
+    entityType: text("entity_type", { enum: ["person", "thing", "place"] }),
     // Groups: a card with a frame *is* a group, and `group_id` is the card that
     // heads the group this one sits in. Deleting a group's card releases its
     // members rather than taking them with it (SET NULL, in bootstrapSchema).

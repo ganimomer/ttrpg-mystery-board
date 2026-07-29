@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import styled, { css } from "styled-components";
 import type { Card as CardData } from "@board/shared";
+import { cardKind, TypeIcon, typeVars } from "./entityTypes";
 import { tearPaths } from "./tear";
 
 interface Props {
@@ -25,10 +26,19 @@ export function CardFace({ card, tack }: Props) {
   // mini tears exactly like its full-size self.
   const tear = useMemo(() => tearPaths(card.id), [card.id]);
 
+  // What the card is, said twice over: a glyph in the frame, and the same colour
+  // washed faintly through the paper it is printed on.
+  const kind = cardKind(card);
+
   if (imageUrl) {
     return (
-      <StyledCardInner>
+      <StyledCardInner style={typeVars(card)}>
         {tack}
+        {kind && (
+          <StyledCardMark>
+            <TypeIcon kind={kind} size={18} />
+          </StyledCardMark>
+        )}
         <StyledCardPhoto>
           <img
             src={imageUrl}
@@ -57,12 +67,20 @@ export function CardFace({ card, tack }: Props) {
       <StyledCardSheet
         style={
           {
+            ...typeVars(card),
             "--tear-face": tear.face,
             "--tear-fiber": tear.fiber,
           } as React.CSSProperties
         }
       >
         <StyledCardSheetFace>
+          {/* In flow rather than pinned to the corner: an untyped sheet then has
+              no gap where a glyph would have been, and reads exactly as before. */}
+          {kind && (
+            <StyledSheetMark>
+              <TypeIcon kind={kind} size={18} />
+            </StyledSheetMark>
+          )}
           {card.title && <StyledCardSheetTitle>{card.title}</StyledCardSheetTitle>}
           {card.note && <StyledCardSheetBody>{card.note}</StyledCardSheetBody>}
           {!card.title && !card.note && !hasNotepad && (
@@ -85,23 +103,33 @@ export function CardFace({ card, tack }: Props) {
 
 /* ─── styles ───────────────────────────────────────────────────── */
 
-/* The white card, painted above the notepad peek that hides behind it. */
+/* The white card, painted above the notepad peek that hides behind it. The top
+   of the frame is wider than the sides — a polaroid's is anyway, and this one has
+   to hold the type glyph without crowding the print. The stock is the kind's ink
+   mixed faintly into the paper; untyped mixes 0% and stays exactly #fdfdf7. */
 export const StyledCardInner = styled.div`
   position: relative;
   z-index: 1;
   width: 100%;
   height: 100%;
-  background: #fdfdf7;
-  padding: 12px 12px 0;
+  background-color: color-mix(in srgb, var(--type-ink) var(--type-mix), #fdfdf7);
+  padding: 30px 14px 0;
   border-radius: 2px;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
-  transition: box-shadow 0.15s ease;
+  transition: box-shadow 0.15s ease, background-color 200ms ease;
   display: flex;
   flex-direction: column;
 
   @media (prefers-reduced-motion: reduce) {
     transition: none;
   }
+`;
+
+/* In the frame above the print, opposite the corner the "hidden" badge takes. */
+const StyledCardMark = styled.div`
+  position: absolute;
+  top: 6px;
+  left: 13px;
 `;
 
 export const StyledCardPhoto = styled.div`
@@ -171,13 +199,20 @@ export const StyledCardSheet = styled.div`
   }
 `;
 
-/** Also worn by the focused card's sheet — same stock, read at arm's length. */
+/** Also worn by the focused card's sheet — same stock, read at arm's length.
+ *  Tinted like the polaroid, but at three-quarters the strength: foolscap is
+ *  already a colour, so the same mix would read twice as loud on it as it does
+ *  on white print stock. */
 export const sheetFace = css`
   position: relative;
   z-index: 1;
   padding: 16px 16px 26px;
   color: #33302a;
-  background-color: #f2e9d3;
+  background-color: color-mix(
+    in srgb,
+    var(--type-ink) calc(var(--type-mix) * 0.75),
+    #f2e9d3
+  );
   background-image: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.5),
@@ -185,6 +220,16 @@ export const sheetFace = css`
     rgba(150, 120, 70, 0.09)
   );
   clip-path: var(--tear-face);
+  transition: background-color 200ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`;
+
+/* Above the title on a sheet, where the polaroid wears its own. */
+const StyledSheetMark = styled.div`
+  margin: 0 0 6px;
 `;
 
 export const StyledCardSheetFace = styled.div`

@@ -48,6 +48,9 @@ const frameField = z
 
 const groupIdField = z.string().max(40).nullable().optional();
 
+/** What the card is. No `group`: that is read off the frame, never stored. */
+const entityTypeField = z.enum(["person", "thing", "place"]).nullable().optional();
+
 const createSchema = z.object({
   title: z.string().max(200).optional(),
   note: z.string().max(2000).optional(),
@@ -56,6 +59,7 @@ const createSchema = z.object({
   y: z.number(),
   rotation: z.number().min(-45).max(45).optional(),
   revealed: z.boolean().optional(),
+  entityType: entityTypeField,
   groupId: groupIdField,
   frame: frameField,
 });
@@ -68,6 +72,7 @@ const updateSchema = z.object({
   y: z.number().optional(),
   rotation: z.number().min(-45).max(45).optional(),
   revealed: z.boolean().optional(),
+  entityType: entityTypeField,
   groupId: groupIdField,
   frame: frameField,
 });
@@ -118,6 +123,7 @@ cardsRoutes.post("/", requireBoardGM, async (c) => {
     y: Math.round(d.y),
     rotation: Math.round(d.rotation ?? 0),
     revealed: d.revealed ?? false,
+    entityType: d.entityType ?? null,
     groupId,
     ...frameColumns(d.frame ?? null),
   });
@@ -156,6 +162,7 @@ cardsRoutes.patch("/:cardId", requireBoardGM, async (c) => {
       ...(d.y !== undefined && { y: Math.round(d.y) }),
       ...(d.rotation !== undefined && { rotation: Math.round(d.rotation) }),
       ...(d.revealed !== undefined && { revealed: d.revealed }),
+      ...(d.entityType !== undefined && { entityType: d.entityType }),
       ...(d.groupId !== undefined && { groupId: d.groupId }),
       ...(d.frame !== undefined && frameColumns(d.frame)),
     })

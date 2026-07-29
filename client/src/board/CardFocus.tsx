@@ -5,6 +5,8 @@ import { api } from "../api";
 import { StyledButton } from "../ui/Button";
 import { StyledInput } from "../ui/Field";
 import { sheetFace, StyledCardPhoto } from "./CardFace";
+import { cardKind, TypeIcon, typeVars } from "./entityTypes";
+import { EntityTypePill } from "./EntityTypePill";
 import { FoldCorner, foldSize } from "./FoldCorner";
 import { DeleteIcon, HideImageIcon } from "./icons";
 import { MiniCard } from "./MiniCard";
@@ -90,6 +92,24 @@ export function CardFocus({
       ? `polygon(0 0, calc(100% - ${fold}px) 0, 100% ${fold}px, 100% 100%, 0 100%)`
       : undefined;
 
+  // What the card is, at the top-left of its frame. A GM picks it from the pill;
+  // a group's kind is settled by the frame it carries, so it is shown rather than
+  // offered — there is nothing to choose, and nothing that could disagree.
+  const kind = cardKind(card);
+  const mark =
+    editable && !card.frame ? (
+      <EntityTypePill
+        value={card.entityType}
+        onChange={(entityType) => save({ entityType })}
+      />
+    ) : kind ? (
+      <TypeIcon
+        kind={kind}
+        size={22}
+        title={card.frame ? "This card heads a group" : undefined}
+      />
+    ) : null;
+
   const fields = (
     <>
       {editable ? (
@@ -148,7 +168,7 @@ export function CardFocus({
 
         <StyledFocusCard
           ref={cardRef}
-          style={{ transform: `rotate(${card.rotation}deg)` }}
+          style={{ ...typeVars(card), transform: `rotate(${card.rotation}deg)` }}
         >
           {editable && (
             <>
@@ -168,6 +188,7 @@ export function CardFocus({
 
           {hasPhoto ? (
             <StyledFocusFacePrint style={{ clipPath: printClip }}>
+              <StyledFocusMark>{mark}</StyledFocusMark>
               <StyledFocusPhoto>
                 <img
                   src={card.imageUrl!}
@@ -196,6 +217,9 @@ export function CardFocus({
                   board card — the face on top is clipped a little higher. */}
               <StyledFocusFiber style={{ clipPath: tear.fiber }} />
               <StyledFocusFaceSheet style={{ clipPath: tear.face }}>
+                {/* In flow, as on the board sheet: with nothing to show, an
+                    untyped sheet keeps its own margins. */}
+                {mark && <StyledFocusSheetMark>{mark}</StyledFocusSheetMark>}
                 {fields}
                 {editable && !urlOpen && (
                   <StyledFocusAddPhoto type="button" onClick={() => setUrlOpen(true)}>
@@ -485,16 +509,45 @@ const focusFace = css`
   }
 `;
 
+/* The frame is deepest at the top, where the type mark lives — the board card's
+   own proportion, read close up. The band is there whether or not there is a
+   mark in it, so a card does not change shape when a GM hands it to a player. */
 const StyledFocusFacePrint = styled.div`
   ${focusFace}
-  padding: 14px 14px 0;
-  background: #fdfdf7;
+  padding: 46px 18px 0;
+  background-color: color-mix(in srgb, var(--type-ink) var(--type-mix), #fdfdf7);
+  transition: background-color 200ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `;
 
 const StyledFocusFaceSheet = styled.div`
   ${focusFace}
   ${sheetFace}
   padding: 26px 26px 40px;
+`;
+
+/* A 30px box either way, so the pill and the plain glyph it stands in for sit on
+   the same line and the band never changes height under them. */
+const markBox = css`
+  display: flex;
+  align-items: center;
+  height: 30px;
+`;
+
+const StyledFocusMark = styled.div`
+  ${markBox}
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 18px;
+`;
+
+const StyledFocusSheetMark = styled.div`
+  ${markBox}
+  margin: 0 0 10px;
 `;
 
 /* Positioned so the hide-image button lands in the print's own corner rather

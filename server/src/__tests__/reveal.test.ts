@@ -13,6 +13,7 @@ function card(id: string, revealed: boolean, extra: Partial<Card> = {}): Card {
     y: 0,
     rotation: 0,
     revealed,
+    entityType: null,
     notepad: [],
     groupId: null,
     frame: null,
